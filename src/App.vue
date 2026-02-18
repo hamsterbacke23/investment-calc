@@ -272,16 +272,16 @@ const exportPDF = () => {
         </div>
 
         <div class="stats-grid">
-          <div class="stat-card highlighted">
-            <label>Final Balance</label>
-            <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
-          </div>
           <div class="stat-card">
             <label>Total Invested</label>
             <h2>{{ (initialCapital + transactions.reduce((acc, t) => {
               const effectiveEnd = (!t.customDuration && t.type === 'monthly') ? durationYears : t.endYear;
               return acc + (t.amount * (t.type === 'monthly' ? (effectiveEnd - t.startYear + 1) * 12 : 1));
             }, 0)).toLocaleString() }} €</h2>
+          </div>
+          <div class="stat-card highlighted">
+            <label>Final Balance</label>
+            <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
           </div>
         </div>
       </div>
