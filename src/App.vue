@@ -241,8 +241,8 @@ const exportPDF = () => {
   <div class="app-container">
     <header class="main-header">
       <div>
-        <h1>Investment Simulator</h1>
-        <p>Financial planning for the future</p>
+        <h1>ETF Investment Calculator</h1>
+        <p>Plan your long-term wealth growth</p>
       </div>
       <button @click="exportPDF" class="btn-primary"><Download size="18" /> PDF Export</button>
     </header>
