@@ -5,7 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // --- State ---
-const initialCapital = ref(80000);
+const initialCapital = ref(30000);
 const durationYears = ref(15);
 const reinvestGains = ref(true);
 const yieldPhases = ref([{ id: 1, startYear: 1, endYear: 15, rate: 6 }]);
@@ -66,23 +66,33 @@ const calculateData = computed(() => {
     const annualRate = phase.rate / 100;
     const monthlyRate = Math.pow(1 + annualRate, 1/12) - 1;
 
+    let yearDeposits = 0;
+    let yearReturns = 0;
+
     for (let month = 1; month <= 12; month++) {
       transactions.value.forEach(t => {
         const effectiveEnd = (!t.customDuration && t.type === 'monthly') ? durationYears.value : t.endYear;
         const isActive = year >= t.startYear && year <= (t.type === 'monthly' ? effectiveEnd : t.startYear);
         if (isActive) {
-          if (t.type === 'monthly') currentBalance += t.amount;
-          else if (t.type === 'once' && month === 1) currentBalance += t.amount;
+          if (t.type === 'monthly') { currentBalance += t.amount; yearDeposits += t.amount; }
+          else if (t.type === 'once' && month === 1) { currentBalance += t.amount; yearDeposits += t.amount; }
         }
       });
 
       const monthlyGain = currentBalance * monthlyRate;
+      yearReturns += monthlyGain;
       if (reinvestGains.value) {
         currentBalance += monthlyGain;
       }
       totalGains += monthlyGain;
     }
-    results.push({ year, balance: Math.round(reinvestGains.value ? currentBalance : currentBalance + totalGains), rate: phase.rate });
+    results.push({
+      year,
+      balance: Math.round(reinvestGains.value ? currentBalance : currentBalance + totalGains),
+      rate: phase.rate,
+      deposits: Math.round(yearDeposits),
+      returns: Math.round(yearReturns)
+    });
   }
   return results;
 });
@@ -92,19 +102,21 @@ const maxBalance = computed(() => Math.max(...calculateData.value.map(x => x.bal
 const barStyle = (d, i) => {
   const max = maxBalance.value;
   const heightPct = (d.balance / max * 100);
-  const prevBalance = i > 0 ? calculateData.value[i - 1].balance : initialCapital.value;
-  const gain = d.balance - prevBalance;
-  // What percentage of THIS bar is the gain portion (top)
-  const gainRatio = d.balance > 0 ? Math.abs(gain) / d.balance : 0;
-  const gainPct = gainRatio * 100;
-  const basePct = 100 - gainPct;
+  // 3 segments: base (previous balance), deposits, returns
+  const depositRatio = d.balance > 0 ? Math.abs(d.deposits) / d.balance : 0;
+  const returnRatio = d.balance > 0 ? Math.abs(d.returns) / d.balance : 0;
 
-  const gainColor = gain >= 0 ? '#22c55e' : '#ef4444';
-  const baseColor = '#3b82f6';
+  const depositPct = depositRatio * 100;
+  const returnPct = returnRatio * 100;
+  const basePct = 100 - depositPct - returnPct;
+
+  const baseColor = '#93c5fd';      // light blue - carried over
+  const depositColor = '#3b82f6';    // medium blue - deposits
+  const returnColor = d.returns >= 0 ? '#1e3a8a' : '#ef4444'; // dark blue / red - returns
 
   return {
     height: heightPct + '%',
-    background: `linear-gradient(to top, ${baseColor} ${basePct}%, ${gainColor} ${basePct}%)`
+    background: `linear-gradient(to top, ${baseColor} ${basePct}%, ${depositColor} ${basePct}% ${basePct + depositPct}%, ${returnColor} ${basePct + depositPct}%)`
   };
 };
 
@@ -237,16 +249,16 @@ const exportPDF = () => {
               <span class="tooltip">
                 <strong>Year {{d.year}}</strong><br>
                 {{d.balance.toLocaleString()}} €
-                <template v-if="i > 0">
-                  <br>
-                  <span :class="d.balance - calculateData[i-1].balance >= 0 ? 'gain-pos' : 'gain-neg'">
-                    {{ d.balance - calculateData[i-1].balance >= 0 ? '+' : '' }}{{ (d.balance - calculateData[i-1].balance).toLocaleString() }} €
-                  </span>
-                </template>
-                <template v-else>
-                  <br>
-                  <span class="gain-pos">+{{ (d.balance - initialCapital).toLocaleString() }} €</span>
-                </template>
+                <br>
+                <span class="gain-deposit">{{ d.deposits >= 0 ? '+' : '' }}{{ d.deposits.toLocaleString() }} € deposits</span>
+                <br>
+                <span :class="d.returns >= 0 ? 'gain-pos' : 'gain-neg'">
+                  {{ d.returns >= 0 ? '+' : '' }}{{ d.returns.toLocaleString() }} € returns
+                </span>
+                <br>
+                <span class="gain-total">
+                  = {{ d.deposits + d.returns >= 0 ? '+' : '' }}{{ (d.deposits + d.returns).toLocaleString() }} € total
+                </span>
               </span>
             </div>
           </div>
@@ -412,6 +424,8 @@ input[type="range"] {
 
 .tooltip .gain-pos { color: #4ade80; }
 .tooltip .gain-neg { color: #f87171; }
+.tooltip .gain-deposit { color: #60a5fa; }
+.tooltip .gain-total { color: #e2e8f0; font-weight: 600; border-top: 1px solid #334155; padding-top: 2px; display: inline-block; margin-top: 2px; }
 
 .bar:hover .tooltip { display: block; }
 
