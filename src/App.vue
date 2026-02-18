@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable';
 const initialCapital = ref(30000);
 const durationYears = ref(15);
 const reinvestGains = ref(true);
-const yieldPhases = ref([{ id: 1, startYear: 1, endYear: 15, rate: 6 }]);
+const yieldPhases = ref([{ id: 1, startYear: 1, endYear: 15, rate: 6, customDuration: false }]);
 const transactions = ref([{ id: 1, name: 'Savings Plan', amount: 500, type: 'monthly', startYear: 1, endYear: 15, customDuration: false }]);
 
 // --- Persistence ---
@@ -24,7 +24,10 @@ const loadFromLocal = () => {
     initialCapital.value = parsed.initialCapital;
     durationYears.value = parsed.durationYears;
     if (parsed.reinvestGains !== undefined) reinvestGains.value = parsed.reinvestGains;
-    yieldPhases.value = parsed.yieldPhases;
+    yieldPhases.value = parsed.yieldPhases.map(p => {
+      if (p.customDuration === undefined) p.customDuration = false;
+      return p;
+    });
     // Migrate old formats
     transactions.value = parsed.transactions.map(t => {
       if (t.duration !== undefined && t.endYear === undefined) {
@@ -42,7 +45,8 @@ watch([initialCapital, durationYears, reinvestGains, yieldPhases, transactions],
 watch(durationYears, (newVal, oldVal) => {
   if (newVal > oldVal) {
     yieldPhases.value.forEach(p => {
-      if (p.endYear === oldVal) p.endYear = newVal;
+      if (!p.customDuration) { p.startYear = 1; p.endYear = newVal; }
+      else if (p.endYear === oldVal) p.endYear = newVal;
     });
     transactions.value.forEach(t => {
       if (t.type === 'monthly' && !t.customDuration) t.endYear = newVal;
@@ -121,17 +125,17 @@ const barStyle = (d, i) => {
 };
 
 // --- Actions ---
-const toggleCustomDuration = (t) => {
-  t.customDuration = !t.customDuration;
-  if (!t.customDuration) {
-    t.startYear = 1;
-    t.endYear = durationYears.value;
+const toggleCustomDuration = (item) => {
+  item.customDuration = !item.customDuration;
+  if (!item.customDuration) {
+    item.startYear = 1;
+    item.endYear = durationYears.value;
   }
 };
 
 const addTransaction = () => transactions.value.push({ id: Date.now(), name: 'Extra Deposit', amount: 500, type: 'monthly', startYear: 1, endYear: durationYears.value, customDuration: false });
 const removeTransaction = (id) => transactions.value = transactions.value.filter(t => t.id !== id);
-const addPhase = () => yieldPhases.value.push({ id: Date.now(), startYear: 1, endYear: durationYears.value, rate: 5 });
+const addPhase = () => yieldPhases.value.push({ id: Date.now(), startYear: 1, endYear: durationYears.value, rate: 5, customDuration: false });
 const removePhase = (id) => yieldPhases.value = yieldPhases.value.filter(p => p.id !== id);
 
 const exportPDF = () => {
@@ -178,24 +182,27 @@ const exportPDF = () => {
           </div>
           <div v-for="p in yieldPhases" :key="p.id" class="item-box">
             <div class="flex-row">
-              <span>Year {{p.startYear}}–{{p.endYear}}</span>
+              <div class="yield-display" :class="{ 'negative': p.rate < 0 }">
+                <TrendingUp v-if="p.rate >= 0" size="14" />
+                <TrendingDown v-else size="14" />
+                {{ p.rate }}%
+              </div>
               <button @click="removePhase(p.id)" class="btn-delete"><Trash2 size="14"/></button>
             </div>
-            <div class="yield-display" :class="{ 'negative': p.rate < 0 }">
-              <TrendingUp v-if="p.rate >= 0" size="14" />
-              <TrendingDown v-else size="14" />
-              {{ p.rate }}%
-            </div>
             <input type="range" v-model.number="p.rate" min="-50" max="30" />
-            <div class="year-range-row">
+            <div v-if="!p.customDuration" class="duration-toggle">
+              <button @click="toggleCustomDuration(p)" class="btn-link"><Calendar size="12" /> Set custom period</button>
+            </div>
+            <div v-if="p.customDuration" class="year-range-row">
               <div class="small-label-input">
-                <label>From</label>
-                <input type="number" v-model.number="p.startYear" class="year-input" placeholder="From" />
+                <label>From year</label>
+                <input type="number" v-model.number="p.startYear" min="1" :max="p.endYear" class="year-input" />
               </div>
               <div class="small-label-input">
-                <label>To</label>
-                <input type="number" v-model.number="p.endYear" class="year-input" placeholder="To" />
+                <label>To year</label>
+                <input type="number" v-model.number="p.endYear" :min="p.startYear" :max="durationYears" class="year-input" />
               </div>
+              <button @click="toggleCustomDuration(p)" class="btn-link btn-link-reset" title="Reset to always">✕</button>
             </div>
           </div>
         </section>
