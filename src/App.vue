@@ -9,7 +9,7 @@ const initialCapital = ref(30000);
 const durationYears = ref(15);
 const reinvestGains = ref(true);
 const yieldPhases = ref([{ id: 1, startYear: 1, endYear: 15, rate: 6 }]);
-const transactions = ref([{ id: 1, name: 'Savings Plan', amount: 2000, type: 'monthly', startYear: 1, endYear: 15, customDuration: false }]);
+const transactions = ref([{ id: 1, name: 'Savings Plan', amount: 500, type: 'monthly', startYear: 1, endYear: 15, customDuration: false }]);
 
 // --- Persistence ---
 const saveToLocal = () => {
