@@ -184,7 +184,9 @@ const taxInfo = computed(() => {
   const taxRate = 0.26375; // 25% Abgeltungssteuer + 5.5% Soli
   const tax = Math.round(taxableAfterFreibetrag * taxRate);
   const afterTax = finalBalance - tax;
-  return { gains, tax, afterTax, effectiveRate: gains > 0 ? (tax / gains * 100).toFixed(1) : '0.0' };
+  const inflationFactor = Math.pow(1.02, durationYears.value);
+  const inTodaysMoney = Math.round((tax > 0 ? afterTax : finalBalance) / inflationFactor);
+  return { gains, tax, afterTax, inTodaysMoney, effectiveRate: gains > 0 ? (tax / gains * 100).toFixed(1) : '0.0' };
 });
 
 const etfBenchmarks = computed(() => {
@@ -370,7 +372,7 @@ const exportPDF = () => {
             <label>Final Balance</label>
             <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
             <span class="tax-note" v-if="taxInfo.tax > 0">After tax (DE): {{ taxInfo.afterTax.toLocaleString() }} € <small>(−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}% eff.)</small></span>
-            <span class="inflation-note">≈ {{ Math.round((taxInfo.tax > 0 ? taxInfo.afterTax : calculateData[calculateData.length-1].balance) / Math.pow(1.02, durationYears)).toLocaleString() }} € in today's money <small>(2% inflation)</small></span>
+            <span class="inflation-note">≈ {{ taxInfo.inTodaysMoney.toLocaleString() }} € in today's money <small>(2% inflation)</small></span>
           </div>
         </div>
       </div>
