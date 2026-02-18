@@ -166,6 +166,27 @@ const etfData = [
   }
 ];
 
+// --- German Tax Calculation (equity ETFs) ---
+const totalInvested = computed(() => {
+  return initialCapital.value + transactions.value.reduce((acc, t) => {
+    const effectiveEnd = (!t.customDuration && t.type === 'monthly') ? durationYears.value : t.endYear;
+    return acc + (t.amount * (t.type === 'monthly' ? (effectiveEnd - t.startYear + 1) * 12 : 1));
+  }, 0);
+});
+
+const taxInfo = computed(() => {
+  const finalBalance = calculateData.value[calculateData.value.length - 1].balance;
+  const gains = Math.max(0, finalBalance - totalInvested.value);
+  const teilfreistellung = 0.30; // 30% tax-free for equity ETFs
+  const taxableGains = gains * (1 - teilfreistellung);
+  const freibetrag = 1000; // Sparerpauschbetrag (single)
+  const taxableAfterFreibetrag = Math.max(0, taxableGains - freibetrag);
+  const taxRate = 0.26375; // 25% Abgeltungssteuer + 5.5% Soli
+  const tax = Math.round(taxableAfterFreibetrag * taxRate);
+  const afterTax = finalBalance - tax;
+  return { gains, tax, afterTax, effectiveRate: gains > 0 ? (tax / gains * 100).toFixed(1) : '0.0' };
+});
+
 const etfBenchmarks = computed(() => {
   const endYear = 2025;
   const startYear = endYear - durationYears.value + 1;
@@ -343,14 +364,13 @@ const exportPDF = () => {
         <div class="stats-grid">
           <div class="stat-card">
             <label>Total Invested</label>
-            <h2>{{ (initialCapital + transactions.reduce((acc, t) => {
-              const effectiveEnd = (!t.customDuration && t.type === 'monthly') ? durationYears : t.endYear;
-              return acc + (t.amount * (t.type === 'monthly' ? (effectiveEnd - t.startYear + 1) * 12 : 1));
-            }, 0)).toLocaleString() }} €</h2>
+            <h2>{{ totalInvested.toLocaleString() }} €</h2>
           </div>
           <div class="stat-card highlighted">
             <label>Final Balance</label>
             <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
+            <span class="tax-note" v-if="taxInfo.tax > 0">After tax (DE): {{ taxInfo.afterTax.toLocaleString() }} € <small>(−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}% eff.)</small></span>
+            <span class="inflation-note">≈ {{ Math.round((taxInfo.tax > 0 ? taxInfo.afterTax : calculateData[calculateData.length-1].balance) / Math.pow(1.02, durationYears)).toLocaleString() }} € in today's money <small>(2% inflation)</small></span>
           </div>
         </div>
       </div>
@@ -540,6 +560,10 @@ input[type="range"] {
 }
 
 .stat-card h2 { font-variant-numeric: tabular-nums; }
+.tax-note { display: block; font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
+.tax-note small { color: #94a3b8; }
+.inflation-note { display: block; font-size: 0.75rem; color: #64748b; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+.inflation-note small { color: #94a3b8; }
 
 .highlighted { background: #eff6ff; border: 1px solid #bfdbfe; }
 
