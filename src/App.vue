@@ -436,7 +436,6 @@ const exportPDF = () => {
   top: 1rem;
   align-self: start;
   contain: layout style;
-  overflow: hidden;
 }
 
 .card {
@@ -542,6 +541,18 @@ input[type="range"] {
   white-space: nowrap;
   z-index: 20;
   pointer-events: none;
+}
+
+/* Prevent right-side tooltips from clipping */
+.bar:nth-last-child(-n+3) .tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.bar:nth-child(-n+3) .tooltip {
+  left: 0;
+  right: auto;
+  transform: none;
 }
 
 .tooltip .gain-pos { color: #4ade80; }
