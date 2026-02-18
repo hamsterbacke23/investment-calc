@@ -331,9 +331,11 @@ const exportPDF = () => {
               </div>
               <button @click="toggleCustomDuration(t)" class="btn-link btn-link-reset" title="Reset to always">✕</button>
             </div>
-            <div v-if="t.type === 'once'" class="small-label-input">
-              <label>In year</label>
-              <input type="number" v-model.number="t.startYear" min="1" :max="durationYears" class="year-input" />
+            <div v-if="t.type === 'once'" class="year-range-row">
+              <div class="small-label-input">
+                <label>In year</label>
+                <input type="number" v-model.number="t.startYear" min="1" :max="durationYears" class="year-input" />
+              </div>
             </div>
           </div>
         </section>
