@@ -124,6 +124,70 @@ const barStyle = (d, i) => {
   };
 };
 
+// --- ETF Benchmark Data (annual returns in EUR, %) ---
+const etfData = [
+  {
+    name: 'iShares MSCI World',
+    ticker: 'EUNL',
+    isin: 'IE00B4L5Y983',
+    ter: 0.20,
+    returns: {
+      2010: 19.5, 2011: -2.4, 2012: 14.0, 2013: 21.2, 2014: 19.5,
+      2015: 10.4, 2016: 10.7, 2017: 7.5, 2018: -4.1, 2019: 30.0,
+      2020: 6.3, 2021: 31.1, 2022: -13.0, 2023: 19.6, 2024: 26.2, 2025: 7.1
+    }
+  },
+  {
+    name: 'Vanguard FTSE All-World',
+    ticker: 'VWCE',
+    isin: 'IE00BK5BQT80',
+    ter: 0.19,
+    returns: {
+      2013: 18.1, 2014: 18.9, 2015: 9.0, 2016: 11.2, 2017: 8.8,
+      2018: -4.8, 2019: 29.5, 2020: 6.3, 2021: 29.0, 2022: -13.0,
+      2023: 17.8, 2024: 24.7, 2025: 8.4
+    }
+  },
+  {
+    name: 'SPDR MSCI ACWI IMI',
+    ticker: 'SPYI',
+    isin: 'IE00B3YLTY66',
+    ter: 0.17,
+    returns: {
+      2012: 14.1, 2013: 17.5, 2014: 18.6, 2015: 8.8, 2016: 11.4,
+      2017: 8.9, 2018: -4.9, 2019: 28.9, 2020: 6.7, 2021: 28.8,
+      2022: -12.4, 2023: 16.9, 2024: 23.5, 2025: 8.1
+    }
+  }
+];
+
+const etfBenchmarks = computed(() => {
+  const endYear = 2025;
+  const startYear = endYear - durationYears.value + 1;
+  return etfData.map(etf => {
+    const years = [];
+    let cumulative = 1;
+    for (let y = startYear; y <= endYear; y++) {
+      if (etf.returns[y] !== undefined) {
+        cumulative *= (1 + etf.returns[y] / 100);
+        years.push(y);
+      }
+    }
+    const n = years.length;
+    const cagr = n > 0 ? (Math.pow(cumulative, 1 / n) - 1) * 100 : null;
+    const totalReturn = (cumulative - 1) * 100;
+    return {
+      ...etf,
+      cagr: cagr !== null ? cagr.toFixed(1) : null,
+      totalReturn: totalReturn.toFixed(0),
+      yearsAvailable: n,
+      yearsRequested: durationYears.value,
+      fromYear: years.length > 0 ? years[0] : null,
+      toYear: years.length > 0 ? years[years.length - 1] : null
+    };
+  });
+});
+
 // --- Actions ---
 const toggleCustomDuration = (item) => {
   item.customDuration = !item.customDuration;
@@ -286,6 +350,26 @@ const exportPDF = () => {
         </div>
       </div>
     </main>
+
+    <footer class="benchmark-section">
+      <h4>ETF Benchmark Reference <span class="benchmark-sub">— Historical annualized returns (EUR), last {{ durationYears }} years</span></h4>
+      <div class="benchmark-grid">
+        <div v-for="etf in etfBenchmarks" :key="etf.isin" class="benchmark-card">
+          <div class="benchmark-name">{{ etf.name }} <span class="benchmark-ticker">{{ etf.ticker }}</span></div>
+          <div class="benchmark-return" v-if="etf.cagr !== null">
+            <span :class="parseFloat(etf.cagr) >= 0 ? 'bm-pos' : 'bm-neg'">{{ parseFloat(etf.cagr) >= 0 ? '+' : '' }}{{ etf.cagr }}%&thinsp;p.a.</span>
+            <span class="benchmark-total">({{ parseFloat(etf.totalReturn) >= 0 ? '+' : '' }}{{ etf.totalReturn }}% total)</span>
+          </div>
+          <div class="benchmark-meta" v-if="etf.cagr !== null">
+            {{ etf.fromYear }}–{{ etf.toYear }}
+            <span v-if="etf.yearsAvailable < etf.yearsRequested" class="benchmark-warn">(only {{ etf.yearsAvailable }}y of data)</span>
+            · TER {{ etf.ter }}%
+          </div>
+          <div v-else class="benchmark-na">No data for this period</div>
+        </div>
+      </div>
+      <p class="benchmark-disclaimer">Past performance is not indicative of future results. Returns include dividends, denominated in EUR. Source: justETF, Feb 2026.</p>
+    </footer>
   </div>
 </template>
 
@@ -504,6 +588,52 @@ input[type="range"] {
 
 .yield-display { font-weight: bold; display: flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; min-width: 5rem; }
 .negative { color: #ef4444; }
+
+/* --- ETF Benchmark --- */
+.benchmark-section {
+  margin-top: 2rem;
+  padding: 1.25rem 1.5rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.benchmark-section h4 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+.benchmark-sub { font-weight: 400; color: #64748b; font-size: 0.85rem; }
+.benchmark-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.benchmark-card {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.benchmark-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+.benchmark-ticker { font-weight: 400; color: #94a3b8; font-size: 0.8rem; }
+.benchmark-return { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.15rem; font-variant-numeric: tabular-nums; }
+.benchmark-total { font-size: 0.8rem; font-weight: 400; color: #64748b; margin-left: 0.35rem; }
+.bm-pos { color: #16a34a; }
+.bm-neg { color: #ef4444; }
+.benchmark-meta { font-size: 0.75rem; color: #94a3b8; }
+.benchmark-warn { color: #f59e0b; }
+.benchmark-na { font-size: 0.8rem; color: #94a3b8; font-style: italic; }
+.benchmark-disclaimer {
+  margin: 0.75rem 0 0;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
 
 @media (max-width: 900px) {
   .grid-layout {
