@@ -419,7 +419,7 @@ const exportPDF = () => {
 
 .grid-layout {
   display: grid;
-  grid-template-columns: 350px 1fr;
+  grid-template-columns: 350px minmax(0, 1fr);
   gap: 2rem;
   align-items: start;
 }
@@ -433,6 +433,8 @@ const exportPDF = () => {
   position: sticky;
   top: 1rem;
   align-self: start;
+  contain: layout style;
+  overflow: hidden;
 }
 
 .card {
@@ -559,9 +561,10 @@ input[type="range"] {
   padding: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
 }
 
-.stat-card h2 { font-variant-numeric: tabular-nums; }
+.stat-card h2 { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tax-note { display: block; font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
 .tax-note small { color: #94a3b8; }
 .inflation-note { display: block; font-size: 0.75rem; color: #64748b; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
