@@ -87,6 +87,27 @@ const calculateData = computed(() => {
   return results;
 });
 
+const maxBalance = computed(() => Math.max(...calculateData.value.map(x => x.balance)));
+
+const barStyle = (d, i) => {
+  const max = maxBalance.value;
+  const heightPct = (d.balance / max * 100);
+  const prevBalance = i > 0 ? calculateData.value[i - 1].balance : initialCapital.value;
+  const gain = d.balance - prevBalance;
+  // What percentage of THIS bar is the gain portion (top)
+  const gainRatio = d.balance > 0 ? Math.abs(gain) / d.balance : 0;
+  const gainPct = gainRatio * 100;
+  const basePct = 100 - gainPct;
+
+  const gainColor = gain >= 0 ? '#22c55e' : '#ef4444';
+  const baseColor = '#3b82f6';
+
+  return {
+    height: heightPct + '%',
+    background: `linear-gradient(to top, ${baseColor} ${basePct}%, ${gainColor} ${basePct}%)`
+  };
+};
+
 // --- Actions ---
 const toggleCustomDuration = (t) => {
   t.customDuration = !t.customDuration;
@@ -210,10 +231,23 @@ const exportPDF = () => {
       <div class="dashboard">
         <div class="chart-container">
           <div class="bars">
-            <div v-for="d in calculateData" :key="d.year" 
+            <div v-for="(d, i) in calculateData" :key="d.year" 
                  class="bar" 
-                 :style="{ height: (d.balance / calculateData[calculateData.length-1].balance * 100) + '%' }">
-              <span class="tooltip">Year {{d.year}}: {{d.balance.toLocaleString()}}€</span>
+                 :style="barStyle(d, i)">
+              <span class="tooltip">
+                <strong>Year {{d.year}}</strong><br>
+                {{d.balance.toLocaleString()}} €
+                <template v-if="i > 0">
+                  <br>
+                  <span :class="d.balance - calculateData[i-1].balance >= 0 ? 'gain-pos' : 'gain-neg'">
+                    {{ d.balance - calculateData[i-1].balance >= 0 ? '+' : '' }}{{ (d.balance - calculateData[i-1].balance).toLocaleString() }} €
+                  </span>
+                </template>
+                <template v-else>
+                  <br>
+                  <span class="gain-pos">+{{ (d.balance - initialCapital).toLocaleString() }} €</span>
+                </template>
+              </span>
             </div>
           </div>
         </div>
@@ -331,10 +365,13 @@ input[type="range"] {
   height: 400px;
   border-radius: 1rem;
   padding: 2rem;
+  padding-top: 3.5rem;
   display: flex;
   align-items: flex-end;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  contain: layout style;
+  contain: style;
+  position: relative;
+  overflow: visible;
 }
 
 .bars {
@@ -347,28 +384,34 @@ input[type="range"] {
 }
 
 .bar {
-  background: #3b82f6;
   flex: 1;
   border-radius: 2px 2px 0 0;
   position: relative;
   transition: height 0.3s ease;
+  min-width: 0;
 }
 
-.bar:hover { background: #2563eb; }
+.bar:hover { filter: brightness(1.15); z-index: 10; }
 
 .tooltip {
   position: absolute;
-  top: -40px;
+  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   background: #0f172a;
   color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
   font-size: 0.7rem;
+  line-height: 1.4;
   display: none;
   white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
 }
+
+.tooltip .gain-pos { color: #4ade80; }
+.tooltip .gain-neg { color: #f87171; }
 
 .bar:hover .tooltip { display: block; }
 
