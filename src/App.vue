@@ -348,7 +348,7 @@ const exportPDF = () => {
                  class="bar" 
                  :style="barStyle(d, i)">
               <span class="tooltip">
-                <strong>Year {{d.year}}</strong><br>
+                <strong>Year {{d.year}} ({{ new Date().getFullYear() + d.year }})</strong><br>
                 {{d.balance.toLocaleString()}} €
                 <br>
                 <span class="gain-deposit">{{ d.deposits >= 0 ? '+' : '' }}{{ d.deposits.toLocaleString() }} € deposits</span>
