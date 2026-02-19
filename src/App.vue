@@ -103,6 +103,10 @@ const calculateData = computed(() => {
 
 const maxBalance = computed(() => Math.max(...calculateData.value.map(x => x.balance)));
 const activeTooltipYear = ref(null);
+const activeTooltipData = computed(() => {
+  if (activeTooltipYear.value === null) return null;
+  return calculateData.value.find(d => d.year === activeTooltipYear.value) || null;
+});
 
 const toggleBarTooltip = (year) => {
   activeTooltipYear.value = activeTooltipYear.value === year ? null : year;
@@ -375,6 +379,20 @@ const exportPDF = () => {
               </span>
             </div>
           </div>
+          <div v-if="activeTooltipData" class="mobile-tooltip" aria-live="polite">
+            <strong>Year {{activeTooltipData.year}} ({{ new Date().getFullYear() + activeTooltipData.year }})</strong><br>
+            {{activeTooltipData.balance.toLocaleString()}} €
+            <br>
+            <span class="gain-deposit">{{ activeTooltipData.deposits >= 0 ? '+' : '' }}{{ activeTooltipData.deposits.toLocaleString() }} € deposits</span>
+            <br>
+            <span :class="activeTooltipData.returns >= 0 ? 'gain-pos' : 'gain-neg'">
+              {{ activeTooltipData.returns >= 0 ? '+' : '' }}{{ activeTooltipData.returns.toLocaleString() }} € returns
+            </span>
+            <br>
+            <span class="gain-total">
+              = {{ activeTooltipData.deposits + activeTooltipData.returns >= 0 ? '+' : '' }}{{ (activeTooltipData.deposits + activeTooltipData.returns).toLocaleString() }} € total
+            </span>
+          </div>
         </div>
 
         <div class="stats-grid">
@@ -448,7 +466,6 @@ const exportPDF = () => {
   position: sticky;
   top: 1rem;
   align-self: start;
-  contain: layout style;
 }
 
 .card {
@@ -518,7 +535,6 @@ input[type="range"] {
   display: flex;
   align-items: flex-end;
   border: 1px solid hsl(var(--border));
-  contain: style;
   position: relative;
   overflow: visible;
 }
@@ -529,6 +545,9 @@ input[type="range"] {
   gap: 4px;
   width: 100%;
   height: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible;
   border-bottom: 2px solid hsl(var(--border));
 }
 
@@ -566,6 +585,10 @@ input[type="range"] {
   right: 0;
   transform: none;
 }
+.bar:nth-last-child(-n+2) .tooltip {
+  bottom: auto;
+  top: 8px;
+}
 .bar:nth-child(-n+3) .tooltip {
   left: 0;
   right: auto;
@@ -579,6 +602,22 @@ input[type="range"] {
 
 .bar:hover .tooltip { display: block; }
 .bar.active .tooltip { display: block; }
+
+.mobile-tooltip {
+  display: none;
+}
+
+.mobile-tooltip .gain-pos { color: #4ade80; }
+.mobile-tooltip .gain-neg { color: #f87171; }
+.mobile-tooltip .gain-deposit { color: #60a5fa; }
+.mobile-tooltip .gain-total {
+  color: hsl(var(--popover-foreground));
+  font-weight: 600;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 2px;
+  display: inline-block;
+  margin-top: 2px;
+}
 
 .stats-grid {
   display: grid;
@@ -707,10 +746,65 @@ input[type="range"] {
     display: flex;
     flex-direction: column;
   }
+  .tooltip {
+    max-width: min(240px, calc(100vw - 2rem));
+    white-space: normal;
+  }
+  .bar .tooltip,
+  .bar:hover .tooltip,
+  .bar.active .tooltip {
+    display: none !important;
+  }
+  .mobile-tooltip {
+    position: absolute;
+    top: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: block;
+    width: min(260px, calc(100% - 1rem));
+    background: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    z-index: 25;
+    pointer-events: none;
+    text-align: left;
+    white-space: normal;
+  }
+  .chart-container {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bars {
+    min-width: max-content;
+    padding-right: 0;
+  }
+  .bars::after {
+    content: "";
+    flex: 0 0 20px;
+  }
+  .bar {
+    min-width: 18px;
+  }
   .dashboard {
     position: static;
     order: -1;
   }
   .sidebar { width: 100%; min-width: unset; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .bar:hover {
+    filter: none;
+    z-index: auto;
+  }
+  .bar .tooltip,
+  .bar:hover .tooltip,
+  .bar.active .tooltip {
+    display: none !important;
+  }
 }
 </style>
