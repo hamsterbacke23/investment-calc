@@ -8,12 +8,28 @@ import autoTable from 'jspdf-autotable';
 const initialCapital = ref(30000);
 const durationYears = ref(15);
 const reinvestGains = ref(true);
+const withdrawalRate = ref(4);
+const isEditingWithdrawalRate = ref(false);
 const yieldPhases = ref([{ id: 1, startYear: 1, endYear: 15, rate: 6, customDuration: false }]);
 const transactions = ref([{ id: 1, name: 'Savings Plan', amount: 500, type: 'monthly', startYear: 1, endYear: 15, customDuration: false }]);
 
+const clampWithdrawalRate = () => {
+  const rate = Number(withdrawalRate.value);
+  if (!Number.isFinite(rate)) {
+    withdrawalRate.value = 4;
+    return;
+  }
+  withdrawalRate.value = Math.min(10, Math.max(1, Number(rate.toFixed(1))));
+};
+
+const closeWithdrawalRateEditor = () => {
+  clampWithdrawalRate();
+  isEditingWithdrawalRate.value = false;
+};
+
 // --- Persistence ---
 const saveToLocal = () => {
-  const data = { initialCapital: initialCapital.value, durationYears: durationYears.value, reinvestGains: reinvestGains.value, yieldPhases: yieldPhases.value, transactions: transactions.value };
+  const data = { initialCapital: initialCapital.value, durationYears: durationYears.value, reinvestGains: reinvestGains.value, withdrawalRate: withdrawalRate.value, yieldPhases: yieldPhases.value, transactions: transactions.value };
   localStorage.setItem('investment_sim_v1', JSON.stringify(data));
 };
 
@@ -24,6 +40,10 @@ const loadFromLocal = () => {
     initialCapital.value = parsed.initialCapital;
     durationYears.value = parsed.durationYears;
     if (parsed.reinvestGains !== undefined) reinvestGains.value = parsed.reinvestGains;
+    if (parsed.withdrawalRate !== undefined) {
+      const rate = Number(parsed.withdrawalRate);
+      withdrawalRate.value = Number.isFinite(rate) ? Math.min(10, Math.max(1, rate)) : 4;
+    }
     yieldPhases.value = parsed.yieldPhases.map(p => {
       if (p.customDuration === undefined) p.customDuration = false;
       return p;
@@ -39,7 +59,7 @@ const loadFromLocal = () => {
   }
 };
 
-watch([initialCapital, durationYears, reinvestGains, yieldPhases, transactions], () => saveToLocal(), { deep: true });
+watch([initialCapital, durationYears, reinvestGains, withdrawalRate, yieldPhases, transactions], () => saveToLocal(), { deep: true });
 
 // Auto-extend yield phases & transactions when total duration increases
 watch(durationYears, (newVal, oldVal) => {
@@ -195,7 +215,23 @@ const taxInfo = computed(() => {
   const afterTax = finalBalance - tax;
   const inflationFactor = Math.pow(1.02, durationYears.value);
   const inTodaysMoney = Math.round((tax > 0 ? afterTax : finalBalance) / inflationFactor);
-  return { gains, tax, afterTax, inTodaysMoney, effectiveRate: gains > 0 ? (tax / gains * 100).toFixed(1) : '0.0' };
+  const safeRate = Number.isFinite(Number(withdrawalRate.value)) ? Math.min(10, Math.max(1, Number(withdrawalRate.value))) : 4;
+  const withdrawalRateDecimal = safeRate / 100;
+  const withdrawalAnnual = Math.round(afterTax * withdrawalRateDecimal);
+  const withdrawalMonthly = Math.round(withdrawalAnnual / 12);
+  const withdrawalAnnualReal = Math.round(inTodaysMoney * withdrawalRateDecimal);
+  const withdrawalMonthlyReal = Math.round(withdrawalAnnualReal / 12);
+  return {
+    gains,
+    tax,
+    afterTax,
+    inTodaysMoney,
+    withdrawalAnnual,
+    withdrawalMonthly,
+    withdrawalAnnualReal,
+    withdrawalMonthlyReal,
+    effectiveRate: gains > 0 ? (tax / gains * 100).toFixed(1) : '0.0'
+  };
 });
 
 const etfBenchmarks = computed(() => {
@@ -249,7 +285,7 @@ const exportPDF = () => {
 </script>
 
 <template>
-  <div class="app-container" @click="activeTooltipYear = null">
+  <div class="app-container" @click="activeTooltipYear = null; closeWithdrawalRateEditor()">
     <header class="main-header">
       <div>
         <h1>ETF Investment Calculator</h1>
@@ -405,6 +441,28 @@ const exportPDF = () => {
             <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
             <span class="tax-note" v-if="taxInfo.tax > 0">After tax (DE): {{ taxInfo.afterTax.toLocaleString() }} € <small>(−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}% eff.)</small></span>
             <span class="inflation-note">≈ {{ taxInfo.inTodaysMoney.toLocaleString() }} € in today's money <small>(2% inflation)</small></span>
+          </div>
+          <div class="stat-card monthly-card">
+            <label class="monthly-label">
+              Final Monthly Income
+              <button v-if="!isEditingWithdrawalRate" class="inline-rate-btn" @click.stop="isEditingWithdrawalRate = true">{{ withdrawalRate.toFixed(1) }}%</button>
+              <input
+                v-else
+                ref="withdrawalRateInput"
+                type="number"
+                class="inline-rate-input"
+                v-model.number="withdrawalRate"
+                min="1"
+                max="10"
+                step="0.1"
+                @click.stop
+                @blur="closeWithdrawalRateEditor"
+                @keydown.enter.prevent="closeWithdrawalRateEditor"
+              />
+            </label>
+            <h2>{{ taxInfo.withdrawalMonthly.toLocaleString() }} €</h2>
+            <span class="tax-note">Nominal after tax <small>({{ taxInfo.withdrawalAnnual.toLocaleString() }} € / year)</small></span>
+            <span class="inflation-note">≈ {{ taxInfo.withdrawalMonthlyReal.toLocaleString() }} € in today's money <small>({{ taxInfo.withdrawalAnnualReal.toLocaleString() }} € / year)</small></span>
           </div>
         </div>
       </div>
@@ -621,7 +679,7 @@ input[type="range"] {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.5rem;
   margin-top: 2rem;
 }
@@ -640,6 +698,45 @@ input[type="range"] {
 .tax-note small { color: hsl(var(--muted-foreground)); opacity: 0.8; }
 .inflation-note { display: block; font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
 .inflation-note small { color: hsl(var(--muted-foreground)); opacity: 0.8; }
+
+.monthly-card h2 {
+  color: hsl(var(--foreground));
+}
+
+.monthly-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+}
+
+.inline-rate-btn {
+  border: none;
+  background: none;
+  color: hsl(var(--foreground));
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0;
+  margin-left: 0.15rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.inline-rate-input {
+  width: 3.8rem !important;
+  min-width: 3.8rem;
+  display: inline-block;
+  vertical-align: baseline;
+  margin: 0 0.2rem;
+  padding: 0.05rem 0.25rem;
+  font-size: 0.78rem;
+  border: 1px solid hsl(var(--input));
+  border-radius: 0.25rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  line-height: 1.1;
+}
 
 .highlighted { background: hsl(var(--secondary)); border: 1px solid hsl(var(--border)); }
 
@@ -740,6 +837,12 @@ input[type="range"] {
   line-height: 1.4;
 }
 
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .grid-layout {
     grid-template-columns: 1fr;
@@ -792,6 +895,9 @@ input[type="range"] {
   .dashboard {
     position: static;
     order: -1;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
   .sidebar { width: 100%; min-width: unset; }
 }
