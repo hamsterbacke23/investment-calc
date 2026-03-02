@@ -217,8 +217,10 @@ const taxInfo = computed(() => {
   const inTodaysMoney = Math.round((tax > 0 ? afterTax : finalBalance) / inflationFactor);
   const safeRate = Number.isFinite(Number(withdrawalRate.value)) ? Math.min(10, Math.max(1, Number(withdrawalRate.value))) : 4;
   const withdrawalRateDecimal = safeRate / 100;
-  const withdrawalAnnual = Math.round(afterTax * withdrawalRateDecimal);
-  const withdrawalMonthly = Math.round(withdrawalAnnual / 12);
+  const withdrawalAnnualNominal = Math.round(finalBalance * withdrawalRateDecimal);
+  const withdrawalMonthlyNominal = Math.round(withdrawalAnnualNominal / 12);
+  const withdrawalAnnualAfterTax = Math.round(afterTax * withdrawalRateDecimal);
+  const withdrawalMonthlyAfterTax = Math.round(withdrawalAnnualAfterTax / 12);
   const withdrawalAnnualReal = Math.round(inTodaysMoney * withdrawalRateDecimal);
   const withdrawalMonthlyReal = Math.round(withdrawalAnnualReal / 12);
   return {
@@ -226,8 +228,10 @@ const taxInfo = computed(() => {
     tax,
     afterTax,
     inTodaysMoney,
-    withdrawalAnnual,
-    withdrawalMonthly,
+    withdrawalAnnualNominal,
+    withdrawalMonthlyNominal,
+    withdrawalAnnualAfterTax,
+    withdrawalMonthlyAfterTax,
     withdrawalAnnualReal,
     withdrawalMonthlyReal,
     effectiveRate: gains > 0 ? (tax / gains * 100).toFixed(1) : '0.0'
@@ -460,8 +464,9 @@ const exportPDF = () => {
                 @keydown.enter.prevent="closeWithdrawalRateEditor"
               />
             </label>
-            <h2>{{ taxInfo.withdrawalMonthly.toLocaleString() }} €</h2>
-            <span class="tax-note">Nominal after tax <small>({{ taxInfo.withdrawalAnnual.toLocaleString() }} € / year)</small></span>
+            <h2>{{ taxInfo.withdrawalMonthlyNominal.toLocaleString() }} €</h2>
+            <span class="tax-note">Nominal before tax <small>({{ taxInfo.withdrawalAnnualNominal.toLocaleString() }} € / year)</small></span>
+            <span class="tax-note">After tax (DE) <small>({{ taxInfo.withdrawalMonthlyAfterTax.toLocaleString() }} € / month · {{ taxInfo.withdrawalAnnualAfterTax.toLocaleString() }} € / year)</small></span>
             <span class="inflation-note">≈ {{ taxInfo.withdrawalMonthlyReal.toLocaleString() }} € in today's money <small>({{ taxInfo.withdrawalAnnualReal.toLocaleString() }} € / year)</small></span>
           </div>
         </div>
