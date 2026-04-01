@@ -143,13 +143,11 @@ const barStyle = (d, i) => {
   const returnPct = returnRatio * 100;
   const basePct = 100 - depositPct - returnPct;
 
-  const baseColor = '#2a3040';      // muted slate - carried over
-  const depositColor = '#3b7d8a';    // teal - deposits
-  const returnColor = d.returns >= 0 ? '#d4a853' : '#f06449'; // gold / coral - returns
+  const returnVar = d.returns >= 0 ? 'var(--bar-return)' : 'var(--bar-return-neg)';
 
   return {
     height: heightPct + '%',
-    background: `linear-gradient(to top, ${baseColor} ${basePct}%, ${depositColor} ${basePct}% ${basePct + depositPct}%, ${returnColor} ${basePct + depositPct}%)`
+    background: `linear-gradient(to top, var(--bar-base) ${basePct}%, var(--bar-deposit) ${basePct}% ${basePct + depositPct}%, ${returnVar} ${basePct + depositPct}%)`
   };
 };
 
@@ -533,7 +531,8 @@ const exportPDF = () => {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: var(--noise-opacity, 0.03);
   pointer-events: none;
   z-index: 0;
 }

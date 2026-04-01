@@ -2,33 +2,71 @@
   font-family: 'DM Sans', system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: dark;
+  color-scheme: light dark;
 
-  --background: 228 25% 7%;
-  --foreground: 225 10% 90%;
-  --card: 228 22% 10%;
-  --card-foreground: 225 10% 90%;
-  --popover: 228 25% 12%;
-  --popover-foreground: 225 10% 90%;
-  --primary: 40 55% 58%;
-  --primary-foreground: 228 25% 7%;
-  --secondary: 228 18% 14%;
-  --secondary-foreground: 225 10% 90%;
-  --muted: 228 18% 13%;
-  --muted-foreground: 225 8% 52%;
-  --accent: 40 55% 58%;
-  --accent-foreground: 228 25% 7%;
-  --destructive: 8 72% 60%;
-  --destructive-foreground: 225 10% 90%;
-  --positive: 155 60% 52%;
-  --border: 228 15% 16%;
-  --input: 228 15% 16%;
-  --ring: 40 55% 58%;
+  /* Light theme (default) */
+  --background: 210 18% 96%;
+  --foreground: 215 25% 14%;
+  --card: 210 15% 99%;
+  --card-foreground: 215 25% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 25% 14%;
+  --primary: 168 45% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 14% 93%;
+  --secondary-foreground: 215 25% 14%;
+  --muted: 210 12% 94%;
+  --muted-foreground: 215 12% 48%;
+  --accent: 168 45% 32%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 4 68% 52%;
+  --destructive-foreground: 0 0% 100%;
+  --positive: 160 55% 30%;
+  --border: 210 14% 88%;
+  --input: 210 14% 88%;
+  --ring: 168 45% 32%;
+
+  --bar-base: #b8c5cc;
+  --bar-deposit: #4a9ea8;
+  --bar-return: #d4913a;
+  --bar-return-neg: #d64545;
+  --noise-opacity: 0.02;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 228 25% 7%;
+    --foreground: 225 10% 90%;
+    --card: 228 22% 10%;
+    --card-foreground: 225 10% 90%;
+    --popover: 228 25% 12%;
+    --popover-foreground: 225 10% 90%;
+    --primary: 40 55% 58%;
+    --primary-foreground: 228 25% 7%;
+    --secondary: 228 18% 14%;
+    --secondary-foreground: 225 10% 90%;
+    --muted: 228 18% 13%;
+    --muted-foreground: 225 8% 52%;
+    --accent: 40 55% 58%;
+    --accent-foreground: 228 25% 7%;
+    --destructive: 8 72% 60%;
+    --destructive-foreground: 225 10% 90%;
+    --positive: 155 60% 52%;
+    --border: 228 15% 16%;
+    --input: 228 15% 16%;
+    --ring: 40 55% 58%;
+
+    --bar-base: #2a3040;
+    --bar-deposit: #3b7d8a;
+    --bar-return: #d4a853;
+    --bar-return-neg: #f06449;
+    --noise-opacity: 0.03;
+  }
 }
 
 a {
