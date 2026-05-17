@@ -22,7 +22,7 @@ import { calculateData, barStyle } from '../composables/useGrowthCalculations.js
       <BarChart :data="calculateData" :bar-style-fn="barStyle" variant="growth" />
       <GrowthStats />
     </div>
-
-    <BenchmarkSection />
   </main>
+
+  <BenchmarkSection />
 </template>
