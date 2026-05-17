@@ -30,6 +30,9 @@ function saveToLocal() {
     inflationRate: inflationRate.value,
     yieldPhases: yieldPhases.value,
     transactions: transactions.value,
+    withdrawalPlanYears: withdrawalPlanYears.value,
+    allowCapitalDecay: allowCapitalDecay.value,
+    withdrawalReturnRate: withdrawalReturnRate.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -49,6 +52,15 @@ export function loadFromLocal() {
     if (parsed.inflationRate !== undefined) {
       const rate = Number(parsed.inflationRate);
       inflationRate.value = Number.isFinite(rate) ? Math.min(20, Math.max(0, rate)) : 2.5;
+    }
+    if (parsed.withdrawalPlanYears !== undefined) {
+      const years = Number(parsed.withdrawalPlanYears);
+      withdrawalPlanYears.value = Number.isFinite(years) ? Math.min(80, Math.max(1, years)) : 30;
+    }
+    if (parsed.allowCapitalDecay !== undefined) allowCapitalDecay.value = !!parsed.allowCapitalDecay;
+    if (parsed.withdrawalReturnRate !== undefined) {
+      const rate = Number(parsed.withdrawalReturnRate);
+      withdrawalReturnRate.value = Number.isFinite(rate) ? Math.min(20, Math.max(0, rate)) : 6;
     }
     yieldPhases.value = parsed.yieldPhases.map((p) => {
       if (p.customDuration === undefined) p.customDuration = false;
@@ -91,7 +103,18 @@ export function initInvestmentStore() {
   loadFromLocal();
 
   watch(
-    [initialCapital, durationYears, reinvestGains, withdrawalRate, inflationRate, yieldPhases, transactions],
+    [
+      initialCapital,
+      durationYears,
+      reinvestGains,
+      withdrawalRate,
+      inflationRate,
+      yieldPhases,
+      transactions,
+      withdrawalPlanYears,
+      allowCapitalDecay,
+      withdrawalReturnRate,
+    ],
     () => saveToLocal(),
     { deep: true },
   );
