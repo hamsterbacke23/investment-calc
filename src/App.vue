@@ -668,22 +668,6 @@ const exportPDF = () => {
             <input type="range" v-model.number="withdrawalReturnRate" min="0" max="15" step="0.1" />
           </div>
         </section>
-
-        <section class="card">
-          <h3>Key Numbers</h3>
-          <div class="key-number">
-            <span class="key-label">Monthly Withdrawal</span>
-            <span class="key-value">{{ monthlyWithdrawalAmount.toLocaleString() }} €</span>
-          </div>
-          <div class="key-number">
-            <span class="key-label">Annual Withdrawal</span>
-            <span class="key-value">{{ (monthlyWithdrawalAmount * 12).toLocaleString() }} €</span>
-          </div>
-          <div class="key-number">
-            <span class="key-label">Plan Duration</span>
-            <span class="key-value">{{ calculateWithdrawalData.length }} years</span>
-          </div>
-        </section>
       </aside>
 
       <div class="dashboard">
@@ -724,11 +708,6 @@ const exportPDF = () => {
         </div>
 
         <div class="stats-grid">
-          <div class="stat-card">
-            <label>Starting Balance</label>
-            <h2>{{ withdrawalTaxInfo.netStartBalance.toLocaleString() }} €</h2>
-            <span class="tax-note">{{ withdrawalTaxInfo.grossStartBalance.toLocaleString() }} € (−{{ withdrawalTaxInfo.totalTax.toLocaleString() }} € · {{ withdrawalTaxInfo.effectiveRate }}% eff.)</span>
-          </div>
           <div class="stat-card monthly-card">
             <label>Monthly Withdrawal</label>
             <h2>{{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} €</h2>
