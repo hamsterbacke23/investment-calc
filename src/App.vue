@@ -277,6 +277,18 @@ const removeTransaction = (id) => transactions.value = transactions.value.filter
 const addPhase = () => yieldPhases.value.push({ id: Date.now(), startYear: 1, endYear: durationYears.value, rate: 5, customDuration: false });
 const removePhase = (id) => yieldPhases.value = yieldPhases.value.filter(p => p.id !== id);
 
+const isTouchDevice = ref(false);
+
+onMounted(() => {
+  loadFromLocal();
+  // Detect touch capability instead of relying on screen size
+  isTouchDevice.value = () => {
+    return (('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0) ||
+            (navigator.msMaxTouchPoints > 0));
+  };
+});
+
 const exportPDF = () => {
   const doc = new jsPDF();
   doc.text('Investment Simulation - Report', 14, 20);
@@ -287,7 +299,7 @@ const exportPDF = () => {
 </script>
 
 <template>
-  <div class="app-container" @click="activeTooltipYear = null; closeWithdrawalRateEditor()">
+  <div class="app-container" :class="{ 'touch-device': isTouchDevice() }" @click="activeTooltipYear = null; closeWithdrawalRateEditor()">
     <header class="main-header">
       <div>
         <h1>ETF Investment Calculator</h1>
@@ -1290,13 +1302,84 @@ input[type="range"]::-moz-range-thumb {
   line-height: 1.4;
 }
 
-/* --- Responsive --- */
-@media (max-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* --- Responsive & Touch --- */
+
+/* For touch devices (phones, tablets, iPads) - use mobile layout regardless of screen size */
+.touch-device .bar .tooltip,
+.touch-device .bar:hover .tooltip,
+.touch-device .bar.active .tooltip {
+  display: none !important;
 }
 
+.touch-device .mobile-tooltip {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: block;
+  width: min(260px, calc(100% - 1rem));
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  z-index: 25;
+  pointer-events: none;
+  text-align: left;
+  white-space: normal;
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 8px 24px hsl(var(--background) / 0.6);
+}
+
+.touch-device .mobile-tooltip strong {
+  color: hsl(var(--primary));
+}
+
+.touch-device .chart-container {
+  height: 300px;
+  padding: 1.25rem;
+  padding-top: 2.5rem;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+.touch-device .bars {
+  min-width: max-content;
+  padding-right: 0;
+}
+
+.touch-device .bars::after {
+  content: "";
+  flex: 0 0 16px;
+}
+
+.touch-device .bar {
+  min-width: 16px;
+}
+
+.touch-device .grid-layout {
+  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.touch-device .dashboard {
+  position: static;
+  order: -1;
+  width: 100%;
+  min-width: 0;
+}
+
+.touch-device .stats-grid {
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* Fallback for non-touch devices on small screens */
 @media (max-width: 900px) {
   .app-container {
     padding: 1rem 0.75rem;
@@ -1321,7 +1404,7 @@ input[type="range"]::-moz-range-thumb {
     gap: 1rem;
   }
 
-  /* Hide hover tooltips on mobile; use panel instead */
+  /* Hide hover tooltips on small screens; use panel instead */
   .bar .tooltip,
   .bar:hover .tooltip,
   .bar.active .tooltip {
