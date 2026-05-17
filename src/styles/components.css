@@ -649,6 +649,32 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .withdrawal-cta:hover .cta-arrow { transform: translateX(4px); }
+.withdrawal-cta--back:hover .cta-arrow { transform: translateX(-4px); }
+
+/* Subtler "back" CTA variant */
+.withdrawal-cta--back {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
+
+.withdrawal-cta--back,
+.withdrawal-cta--back:hover,
+.withdrawal-cta--back:focus,
+.withdrawal-cta--back:visited {
+  color: hsl(var(--foreground));
+}
+
+.withdrawal-cta--back:hover {
+  border-color: hsl(var(--primary) / 0.35);
+  filter: none;
+  box-shadow: 0 6px 18px hsl(var(--foreground) / 0.06);
+}
+
+.withdrawal-cta--back .cta-label { color: hsl(var(--muted-foreground)); }
+.withdrawal-cta--back .cta-headline { color: hsl(var(--foreground)); }
+.withdrawal-cta--back .cta-arrow { color: hsl(var(--primary)); }
 
 /* --- Duration / Year controls --- */
 .small-label-input {
