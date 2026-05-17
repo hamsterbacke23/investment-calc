@@ -503,6 +503,14 @@ const exportPDF = () => {
               <button @click="toggleCustomDuration(p)" class="btn-link btn-link-reset" title="Reset to always">✕</button>
             </div>
           </div>
+          <div class="setting-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid hsl(var(--border));">
+            <label class="setting-label-text">Expected Inflation</label>
+            <div class="setting-row">
+              <input type="number" v-model.number="inflationRate" min="0" max="20" step="0.1" />
+              <span class="setting-value">{{ inflationRate.toFixed(1) }}%</span>
+            </div>
+            <input type="range" v-model.number="inflationRate" min="0" max="20" step="0.1" />
+          </div>
         </section>
 
         <section class="card">
@@ -543,14 +551,6 @@ const exportPDF = () => {
                 <input type="number" v-model.number="t.startYear" min="1" :max="durationYears" class="year-input" />
               </div>
             </div>
-          </div>
-          <div class="setting-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid hsl(var(--border));">
-            <label class="setting-label-text">Expected Inflation</label>
-            <div class="setting-row">
-              <input type="number" v-model.number="inflationRate" min="0" max="20" step="0.1" />
-              <span class="setting-value">{{ inflationRate.toFixed(1) }}%</span>
-            </div>
-            <input type="range" v-model.number="inflationRate" min="0" max="20" step="0.1" />
           </div>
         </section>
       </aside>
