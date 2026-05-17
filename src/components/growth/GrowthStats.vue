@@ -19,16 +19,16 @@ import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
         <div v-if="taxInfo.tax > 0" class="breakdown-row">
           <dt>After tax <span class="muted">(DE ETF)</span></dt>
           <dd>
-            <span class="amount">{{ taxInfo.afterTax.toLocaleString() }} €</span>
             <span class="delta delta-neg">−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}%</span>
+            <span class="amount">{{ taxInfo.afterTax.toLocaleString() }} €</span>
           </dd>
         </div>
 
         <div class="breakdown-row">
           <dt>Today's purchasing power</dt>
           <dd>
-            <span class="amount">{{ taxInfo.inTodaysMoney.toLocaleString() }} €</span>
             <span class="delta">at {{ inflationRate.toFixed(1) }}% inflation</span>
+            <span class="amount">{{ taxInfo.inTodaysMoney.toLocaleString() }} €</span>
           </dd>
         </div>
       </dl>
