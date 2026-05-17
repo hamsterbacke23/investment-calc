@@ -1302,9 +1302,8 @@ input[type="range"]::-moz-range-thumb {
   line-height: 1.4;
 }
 
-/* --- Responsive & Touch --- */
-
-/* For touch devices (phones, tablets, iPads) - use mobile layout regardless of screen size */
+/* --- Touch Device Behavior --- */
+/* For ALL touch devices: use click tooltips instead of hover tooltips */
 .touch-device .bar .tooltip,
 .touch-device .bar:hover .tooltip,
 .touch-device .bar.active .tooltip {
@@ -1336,50 +1335,7 @@ input[type="range"]::-moz-range-thumb {
   color: hsl(var(--primary));
 }
 
-.touch-device .chart-container {
-  height: 300px;
-  padding: 1.25rem;
-  padding-top: 2.5rem;
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-}
-
-.touch-device .bars {
-  min-width: max-content;
-  padding-right: 0;
-}
-
-.touch-device .bars::after {
-  content: "";
-  flex: 0 0 16px;
-}
-
-.touch-device .bar {
-  min-width: 16px;
-}
-
-.touch-device .grid-layout {
-  grid-template-columns: 1fr;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.touch-device .dashboard {
-  position: static;
-  order: -1;
-  width: 100%;
-  min-width: 0;
-}
-
-.touch-device .stats-grid {
-  grid-template-columns: 1fr;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-/* Fallback for non-touch devices on small screens */
+/* --- Responsive & Screen Size --- */
 @media (max-width: 900px) {
   .app-container {
     padding: 1rem 0.75rem;
