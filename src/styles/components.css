@@ -740,6 +740,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* --- ETF Benchmark --- */
 .benchmark-section {
+  grid-column: 1 / -1;
   margin-top: 2rem;
   padding: 1.25rem 1.5rem;
   background: hsl(var(--card));
