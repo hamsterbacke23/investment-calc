@@ -1,6 +1,26 @@
 <script setup>
-import { withdrawalPlanYears } from '../../composables/useInvestmentStore.js';
+import { computed } from 'vue';
+import {
+  withdrawalPlanYears,
+  inflationRate,
+  durationYears,
+} from '../../composables/useInvestmentStore.js';
 import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
+import { inflationAdjusted } from '../../utils/tax.js';
+
+const monthlyTax = computed(() =>
+  withdrawalTaxInfo.value.monthlyGross - withdrawalTaxInfo.value.monthlyNet,
+);
+
+const monthlyNetToday = computed(() =>
+  Math.round(
+    inflationAdjusted(
+      withdrawalTaxInfo.value.monthlyNet,
+      inflationRate.value,
+      durationYears.value,
+    ),
+  ),
+);
 </script>
 
 <template>
@@ -16,19 +36,19 @@ import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
       <h2 class="final-balance-headline">{{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} €</h2>
 
       <dl class="balance-breakdown">
-        <div class="breakdown-row">
-          <dt>Gross monthly withdrawal</dt>
+        <div v-if="withdrawalTaxInfo.totalTax > 0" class="breakdown-row">
+          <dt>Gross monthly <span class="muted">(before tax)</span></dt>
           <dd>
-            <span class="delta">before tax</span>
+            <span class="delta delta-neg">−{{ monthlyTax.toLocaleString() }} € tax · {{ withdrawalTaxInfo.effectiveRate }}%</span>
             <span class="amount">{{ withdrawalTaxInfo.monthlyGross.toLocaleString() }} €</span>
           </dd>
         </div>
 
-        <div v-if="withdrawalTaxInfo.totalTax > 0" class="breakdown-row">
-          <dt>After tax <span class="muted">(DE ETF)</span></dt>
+        <div class="breakdown-row">
+          <dt>Today's purchasing power</dt>
           <dd>
-            <span class="delta delta-neg">−{{ (withdrawalTaxInfo.monthlyGross - withdrawalTaxInfo.monthlyNet).toLocaleString() }} € · {{ withdrawalTaxInfo.effectiveRate }}%</span>
-            <span class="amount">{{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} €</span>
+            <span class="delta">at {{ inflationRate.toFixed(1) }}% inflation</span>
+            <span class="amount">{{ monthlyNetToday.toLocaleString() }} €</span>
           </dd>
         </div>
       </dl>
