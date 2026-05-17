@@ -11,7 +11,7 @@ export const yieldPhases = ref([
   { id: 1, startYear: 1, endYear: 15, rate: 6, customDuration: false },
 ]);
 export const transactions = ref([
-  { id: 1, name: 'Savings Plan', amount: 500, type: 'monthly', startYear: 1, endYear: 15, customDuration: false },
+  { id: 1, name: 'Sparplan', amount: 500, type: 'monthly', startYear: 1, endYear: 15, customDuration: false },
 ]);
 
 // --- Withdrawal phase state ---
@@ -84,7 +84,7 @@ export const addPhase = () =>
 export const removePhase = (id) => (yieldPhases.value = yieldPhases.value.filter((p) => p.id !== id));
 
 export const addTransaction = () =>
-  transactions.value.push({ id: Date.now(), name: 'Extra Deposit', amount: 500, type: 'monthly', startYear: 1, endYear: durationYears.value, customDuration: false });
+  transactions.value.push({ id: Date.now(), name: 'Zusätzliche Einzahlung', amount: 500, type: 'monthly', startYear: 1, endYear: durationYears.value, customDuration: false });
 export const removeTransaction = (id) => (transactions.value = transactions.value.filter((t) => t.id !== id));
 
 export const toggleCustomDuration = (item) => {

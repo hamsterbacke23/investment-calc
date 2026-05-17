@@ -12,7 +12,7 @@ import {
 <template>
   <section class="card">
     <div class="card-header">
-      <h3>Return</h3>
+      <h3>Rendite</h3>
       <button @click="addPhase" class="btn-icon"><Plus size="16" /></button>
     </div>
     <div v-for="p in yieldPhases" :key="p.id" class="item-box">
@@ -27,19 +27,19 @@ import {
       <input type="range" v-model.number="p.rate" min="-50" max="30" />
       <div v-if="!p.customDuration" class="duration-toggle">
         <button @click="toggleCustomDuration(p)" class="btn-link">
-          <Calendar size="12" /> Set custom period
+          <Calendar size="12" /> Zeitraum festlegen
         </button>
       </div>
       <div v-if="p.customDuration" class="year-range-row">
         <div class="small-label-input">
-          <label>From year</label>
+          <label>Ab Jahr</label>
           <input type="number" v-model.number="p.startYear" min="1" :max="p.endYear" class="year-input" />
         </div>
         <div class="small-label-input">
-          <label>To year</label>
+          <label>Bis Jahr</label>
           <input type="number" v-model.number="p.endYear" :min="p.startYear" :max="durationYears" class="year-input" />
         </div>
-        <button @click="toggleCustomDuration(p)" class="btn-link btn-link-reset" title="Reset to always">✕</button>
+        <button @click="toggleCustomDuration(p)" class="btn-link btn-link-reset" title="Auf gesamte Laufzeit zurücksetzen">✕</button>
       </div>
     </div>
   </section>

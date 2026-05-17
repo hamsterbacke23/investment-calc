@@ -39,52 +39,52 @@ defineExpose({ clearTooltip });
         @keydown.space.stop.prevent="toggle(d.year)"
         tabindex="0"
         role="button"
-        :aria-label="`Show details for year ${d.year}`"
+        :aria-label="`Details für Jahr ${d.year}`"
       >
         <span class="tooltip">
-          <strong>Year {{ d.year }} ({{ currentYear + d.year }})</strong><br>
+          <strong>Jahr {{ d.year }} ({{ currentYear + d.year }})</strong><br>
           {{ d.balance.toLocaleString() }} €
           <template v-if="variant === 'growth'">
             <br>
-            <span class="gain-deposit">{{ d.deposits >= 0 ? '+' : '' }}{{ d.deposits.toLocaleString() }} € deposits</span>
+            <span class="gain-deposit">{{ d.deposits >= 0 ? '+' : '' }}{{ d.deposits.toLocaleString() }} € Einzahlungen</span>
             <br>
             <span :class="d.returns >= 0 ? 'gain-pos' : 'gain-neg'">
-              {{ d.returns >= 0 ? '+' : '' }}{{ d.returns.toLocaleString() }} € returns
+              {{ d.returns >= 0 ? '+' : '' }}{{ d.returns.toLocaleString() }} € Rendite
             </span>
             <br>
             <span class="gain-total">
-              = {{ d.deposits + d.returns >= 0 ? '+' : '' }}{{ (d.deposits + d.returns).toLocaleString() }} € total
+              = {{ d.deposits + d.returns >= 0 ? '+' : '' }}{{ (d.deposits + d.returns).toLocaleString() }} € gesamt
             </span>
           </template>
           <template v-else>
             <br>
-            <span class="gain-deposit">−{{ d.withdrawal.toLocaleString() }} € withdrawal</span>
+            <span class="gain-deposit">−{{ d.withdrawal.toLocaleString() }} € Entnahme</span>
             <br>
-            <span class="gain-pos">+{{ d.returns.toLocaleString() }} € returns</span>
+            <span class="gain-pos">+{{ d.returns.toLocaleString() }} € Rendite</span>
           </template>
         </span>
       </div>
     </div>
     <div v-if="activeData" class="mobile-tooltip" aria-live="polite">
-      <strong>Year {{ activeData.year }} ({{ currentYear + activeData.year }})</strong><br>
+      <strong>Jahr {{ activeData.year }} ({{ currentYear + activeData.year }})</strong><br>
       {{ activeData.balance.toLocaleString() }} €
       <template v-if="variant === 'growth'">
         <br>
-        <span class="gain-deposit">{{ activeData.deposits >= 0 ? '+' : '' }}{{ activeData.deposits.toLocaleString() }} € deposits</span>
+        <span class="gain-deposit">{{ activeData.deposits >= 0 ? '+' : '' }}{{ activeData.deposits.toLocaleString() }} € Einzahlungen</span>
         <br>
         <span :class="activeData.returns >= 0 ? 'gain-pos' : 'gain-neg'">
-          {{ activeData.returns >= 0 ? '+' : '' }}{{ activeData.returns.toLocaleString() }} € returns
+          {{ activeData.returns >= 0 ? '+' : '' }}{{ activeData.returns.toLocaleString() }} € Rendite
         </span>
         <br>
         <span class="gain-total">
-          = {{ activeData.deposits + activeData.returns >= 0 ? '+' : '' }}{{ (activeData.deposits + activeData.returns).toLocaleString() }} € total
+          = {{ activeData.deposits + activeData.returns >= 0 ? '+' : '' }}{{ (activeData.deposits + activeData.returns).toLocaleString() }} € gesamt
         </span>
       </template>
       <template v-else>
         <br>
-        <span class="gain-deposit">−{{ activeData.withdrawal.toLocaleString() }} € withdrawal</span>
+        <span class="gain-deposit">−{{ activeData.withdrawal.toLocaleString() }} € Entnahme</span>
         <br>
-        <span class="gain-pos">+{{ activeData.returns.toLocaleString() }} € returns</span>
+        <span class="gain-pos">+{{ activeData.returns.toLocaleString() }} € Rendite</span>
       </template>
     </div>
   </div>

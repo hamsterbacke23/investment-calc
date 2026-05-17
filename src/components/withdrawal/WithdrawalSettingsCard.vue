@@ -8,28 +8,28 @@ import {
 
 <template>
   <section class="card">
-    <h3>Withdrawal Settings</h3>
+    <h3>Entnahme-Einstellungen</h3>
     <div class="setting-group">
       <label class="setting-label">
         <input type="checkbox" v-model="allowCapitalDecay" />
-        <span>Allow capital decay</span>
+        <span>Kapital aufzehren erlauben</span>
       </label>
       <span class="setting-help">
-        {{ allowCapitalDecay ? 'Withdraw all money including principal' : 'Withdraw only returns' }}
+        {{ allowCapitalDecay ? 'Gesamtes Kapital inkl. Stamm wird entnommen' : 'Nur Renditen werden entnommen' }}
       </span>
     </div>
 
     <div class="setting-group">
-      <label class="setting-label-text">Withdrawal Duration</label>
+      <label class="setting-label-text">Entnahmedauer</label>
       <div class="setting-row">
         <input type="number" v-model.number="withdrawalPlanYears" min="1" max="100" step="1" />
-        <span class="setting-value">{{ withdrawalPlanYears }} years</span>
+        <span class="setting-value">{{ withdrawalPlanYears }} Jahre</span>
       </div>
       <input type="range" v-model.number="withdrawalPlanYears" min="1" max="100" />
     </div>
 
     <div class="setting-group">
-      <label class="setting-label-text">Assumed Annual Return</label>
+      <label class="setting-label-text">Erwartete jährliche Rendite</label>
       <div class="setting-row">
         <input type="number" v-model.number="withdrawalReturnRate" min="0" max="15" step="0.1" />
         <span class="setting-value">{{ withdrawalReturnRate.toFixed(1) }}%</span>

@@ -9,7 +9,7 @@ import { inflationRate } from '../../composables/useInvestmentStore.js';
     </div>
     <div class="item-box">
       <div class="flex-row">
-        <span class="item-label">{{ inflationRate.toFixed(1) }}% / year</span>
+        <span class="item-label">{{ inflationRate.toFixed(1) }}% / Jahr</span>
       </div>
       <input type="range" v-model.number="inflationRate" min="0" max="20" step="0.1" />
     </div>

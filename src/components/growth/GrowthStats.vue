@@ -1,5 +1,5 @@
 <script setup>
-import { inflationRate } from '../../composables/useInvestmentStore.js';
+import { inflationRate, withdrawalPlanYears } from '../../composables/useInvestmentStore.js';
 import { totalInvested, finalBalance, taxInfo } from '../../composables/useGrowthCalculations.js';
 import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
 </script>
@@ -7,17 +7,17 @@ import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
 <template>
   <div class="stats-grid stats-grid--split">
     <div class="stat-card">
-      <label>Total Invested</label>
+      <label>Eingezahlt insgesamt</label>
       <h2>{{ totalInvested.toLocaleString() }} €</h2>
     </div>
 
     <div class="stat-card highlighted final-balance-card">
-      <label>Final Balance</label>
+      <label>Endkapital</label>
       <h2 class="final-balance-headline">{{ finalBalance.toLocaleString() }} €</h2>
 
       <dl class="balance-breakdown">
         <div v-if="taxInfo.tax > 0" class="breakdown-row">
-          <dt>After tax <span class="muted">(DE ETF)</span></dt>
+          <dt>Nach Steuern <span class="muted">(DE-ETF)</span></dt>
           <dd>
             <span class="delta delta-neg">−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}%</span>
             <span class="amount">{{ taxInfo.afterTax.toLocaleString() }} €</span>
@@ -25,9 +25,9 @@ import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
         </div>
 
         <div class="breakdown-row">
-          <dt>Today's purchasing power</dt>
+          <dt>Heutige Kaufkraft</dt>
           <dd>
-            <span class="delta">at {{ inflationRate.toFixed(1) }}% inflation</span>
+            <span class="delta">bei {{ inflationRate.toFixed(1) }}% Inflation</span>
             <span class="amount">{{ taxInfo.inTodaysMoney.toLocaleString() }} €</span>
           </dd>
         </div>
@@ -37,10 +37,10 @@ import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
 
   <RouterLink to="/withdrawal" class="withdrawal-cta">
     <div class="cta-text">
-      <span class="cta-label">Plan the withdrawal phase</span>
+      <span class="cta-label">Entnahmephase planen</span>
       <span class="cta-headline">
-        ≈ {{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} € / month
-        <span class="cta-detail">net for 30 years</span>
+        ≈ {{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} € / Monat
+        <span class="cta-detail">netto über {{ withdrawalPlanYears }} Jahre</span>
       </span>
     </div>
     <span class="cta-arrow" aria-hidden="true">→</span>
