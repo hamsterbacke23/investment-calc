@@ -278,6 +278,93 @@ const addPhase = () => yieldPhases.value.push({ id: Date.now(), startYear: 1, en
 const removePhase = (id) => yieldPhases.value = yieldPhases.value.filter(p => p.id !== id);
 
 const isTouchDevice = ref(false);
+const activeTab = ref('growth'); // 'growth' or 'withdrawal'
+
+// --- Withdrawal Plan State ---
+const withdrawalPlanYears = ref(30);
+const allowCapitalDecay = ref(true);
+const withdrawalReturnRate = ref(3); // assumed annual return during withdrawal phase
+const activeWithdrawalTooltipYear = ref(null);
+
+const calculateWithdrawalData = computed(() => {
+  const startingBalance = calculateData.value[calculateData.value.length - 1].balance;
+  let results = [];
+  let currentBalance = startingBalance;
+  const monthlyReturnRate = Math.pow(1 + withdrawalReturnRate.value / 100, 1 / 12) - 1;
+
+  // Calculate monthly withdrawal amount to deplete balance over duration
+  // PMT formula: payment = balance / ((1 - (1 + r)^-n) / r)
+  const nMonths = withdrawalPlanYears.value * 12;
+  const monthlyWithdrawal = allowCapitalDecay.value
+    ? Math.round(currentBalance / (((1 - Math.pow(1 + monthlyReturnRate, -nMonths)) / monthlyReturnRate) || nMonths))
+    : Math.round(currentBalance * (withdrawalReturnRate.value / 100) / 12);
+
+  for (let year = 1; year <= withdrawalPlanYears.value; year++) {
+    let yearWithdrawals = 0;
+    let yearReturns = 0;
+
+    for (let month = 1; month <= 12; month++) {
+      // Calculate returns on current balance
+      const monthlyReturn = currentBalance * monthlyReturnRate;
+      yearReturns += monthlyReturn;
+      currentBalance += monthlyReturn;
+
+      // Withdraw amount
+      if (currentBalance > 0) {
+        const withdrawal = Math.min(monthlyWithdrawal, currentBalance);
+        currentBalance -= withdrawal;
+        yearWithdrawals += withdrawal;
+      }
+    }
+
+    results.push({
+      year,
+      balance: Math.round(currentBalance),
+      withdrawal: Math.round(yearWithdrawals),
+      returns: Math.round(yearReturns)
+    });
+
+    if (currentBalance <= 0) break;
+  }
+
+  return results;
+});
+
+const maxWithdrawalBalance = computed(() => {
+  const values = calculateWithdrawalData.value.map(x => x.balance);
+  return Math.max(...values, 1);
+});
+
+const activeWithdrawalTooltipData = computed(() => {
+  if (activeWithdrawalTooltipYear.value === null) return null;
+  return calculateWithdrawalData.value.find(d => d.year === activeWithdrawalTooltipYear.value) || null;
+});
+
+const toggleWithdrawalBarTooltip = (year) => {
+  activeWithdrawalTooltipYear.value = activeWithdrawalTooltipYear.value === year ? null : year;
+};
+
+const withdrawalBarStyle = (d) => {
+  const max = maxWithdrawalBalance.value;
+  const heightPct = (d.balance / max * 100);
+  const withdrawalRatio = d.balance > 0 ? Math.abs(d.withdrawal) / d.balance : 0;
+  const returnRatio = d.balance > 0 ? Math.abs(d.returns) / d.balance : 0;
+
+  const withdrawalPct = withdrawalRatio * 100;
+  const returnPct = returnRatio * 100;
+  const basePct = 100 - withdrawalPct - returnPct;
+
+  return {
+    height: heightPct + '%',
+    background: `linear-gradient(to top, var(--bar-base) ${basePct}%, var(--bar-deposit) ${basePct}% ${basePct + withdrawalPct}%, var(--bar-return) ${basePct + withdrawalPct}%)`
+  };
+};
+
+const monthlyWithdrawalAmount = computed(() => {
+  if (calculateWithdrawalData.value.length === 0) return 0;
+  const totalAnnual = calculateWithdrawalData.value[0].withdrawal;
+  return Math.round(totalAnnual / 12);
+});
 
 onMounted(() => {
   loadFromLocal();
@@ -299,7 +386,7 @@ const exportPDF = () => {
 </script>
 
 <template>
-  <div class="app-container" :class="{ 'touch-device': isTouchDevice() }" @click="activeTooltipYear = null; closeWithdrawalRateEditor()">
+  <div class="app-container" :class="{ 'touch-device': isTouchDevice() }" @click="activeTooltipYear = null; activeWithdrawalTooltipYear = null; closeWithdrawalRateEditor()">
     <header class="main-header">
       <div>
         <h1>ETF Investment Calculator</h1>
@@ -308,7 +395,24 @@ const exportPDF = () => {
       <button @click="exportPDF" class="btn-primary"><Download size="18" /> PDF Export</button>
     </header>
 
-    <main class="grid-layout">
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+      <button 
+        class="tab-button" 
+        :class="{ active: activeTab === 'growth' }"
+        @click="activeTab = 'growth'">
+        <span>Vermögensaufbau</span>
+      </button>
+      <button 
+        class="tab-button" 
+        :class="{ active: activeTab === 'withdrawal' }"
+        @click="activeTab = 'withdrawal'">
+        <span>Entnahmeplan</span>
+      </button>
+    </div>
+
+    <!-- Growth Tab Content -->
+    <main class="grid-layout" v-if="activeTab === 'growth'">
       <aside class="sidebar">
         <section class="card">
           <h3>Initial Capital</h3>
@@ -457,27 +561,11 @@ const exportPDF = () => {
             <span class="inflation-note">≈ {{ taxInfo.inTodaysMoney.toLocaleString() }} € in today's money <small>(2% inflation)</small></span>
           </div>
           <div class="stat-card monthly-card">
-            <label class="monthly-label">
-              Final Monthly Income
-              <button v-if="!isEditingWithdrawalRate" class="inline-rate-btn" @click.stop="isEditingWithdrawalRate = true">{{ withdrawalRate.toFixed(1) }}%</button>
-              <input
-                v-else
-                ref="withdrawalRateInput"
-                type="number"
-                class="inline-rate-input"
-                v-model.number="withdrawalRate"
-                min="1"
-                max="10"
-                step="0.1"
-                @click.stop
-                @blur="closeWithdrawalRateEditor"
-                @keydown.enter.prevent="closeWithdrawalRateEditor"
-              />
-            </label>
-            <h2>{{ taxInfo.withdrawalMonthlyNominal.toLocaleString() }} €</h2>
-            <span class="tax-note">Nominal before tax <small>({{ taxInfo.withdrawalAnnualNominal.toLocaleString() }} € / year)</small></span>
-            <span class="tax-note">After tax (DE) <small>({{ taxInfo.withdrawalMonthlyAfterTax.toLocaleString() }} € / month · {{ taxInfo.withdrawalAnnualAfterTax.toLocaleString() }} € / year)</small></span>
-            <span class="inflation-note">≈ {{ taxInfo.withdrawalMonthlyReal.toLocaleString() }} € in today's money <small>({{ taxInfo.withdrawalAnnualReal.toLocaleString() }} € / year)</small></span>
+            <label>View Withdrawal Plan</label>
+            <button @click="activeTab = 'withdrawal'" class="btn-view-plan">
+              Entnahmeplan <span class="arrow">→</span>
+            </button>
+            <span class="plan-note">Calculate monthly income</span>
           </div>
         </div>
       </div>
@@ -502,8 +590,122 @@ const exportPDF = () => {
       </div>
       <p class="benchmark-disclaimer">Past performance is not indicative of future results. Returns include dividends, denominated in EUR. Source: justETF, Feb 2026.</p>
     </footer>
-  </div>
-</template>
+
+    <!-- Withdrawal Plan Tab Content -->
+    <main class="grid-layout" v-if="activeTab === 'withdrawal'">
+      <aside class="sidebar">
+        <section class="card">
+          <h3>Starting Balance</h3>
+          <div class="balance-display">
+            <h2 class="balance-value">{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
+            <span class="balance-note">from growth phase</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Withdrawal Settings</h3>
+          <div class="setting-group">
+            <label class="setting-label">
+              <input type="checkbox" v-model="allowCapitalDecay" />
+              <span>Allow capital decay</span>
+            </label>
+            <span class="setting-help">{{ allowCapitalDecay ? 'Withdraw all money including principal' : 'Withdraw only returns' }}</span>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label-text">Withdrawal Duration</label>
+            <div class="setting-row">
+              <input type="number" v-model.number="withdrawalPlanYears" min="1" max="100" step="1" />
+              <span class="setting-value">{{ withdrawalPlanYears }} years</span>
+            </div>
+            <input type="range" v-model.number="withdrawalPlanYears" min="1" max="100" />
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-label-text">Assumed Annual Return</label>
+            <div class="setting-row">
+              <input type="number" v-model.number="withdrawalReturnRate" min="0" max="15" step="0.1" />
+              <span class="setting-value">{{ withdrawalReturnRate.toFixed(1) }}%</span>
+            </div>
+            <input type="range" v-model.number="withdrawalReturnRate" min="0" max="15" step="0.1" />
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Key Numbers</h3>
+          <div class="key-number">
+            <span class="key-label">Monthly Withdrawal</span>
+            <span class="key-value">{{ monthlyWithdrawalAmount.toLocaleString() }} €</span>
+          </div>
+          <div class="key-number">
+            <span class="key-label">Annual Withdrawal</span>
+            <span class="key-value">{{ (monthlyWithdrawalAmount * 12).toLocaleString() }} €</span>
+          </div>
+          <div class="key-number">
+            <span class="key-label">Plan Duration</span>
+            <span class="key-value">{{ calculateWithdrawalData.length }} years</span>
+          </div>
+        </section>
+      </aside>
+
+      <div class="dashboard">
+        <div class="chart-container">
+          <div class="bars">
+            <div v-for="(d, i) in calculateWithdrawalData" :key="d.year" 
+                 class="bar" 
+                 :class="{ active: activeWithdrawalTooltipYear === d.year }"
+                 :style="withdrawalBarStyle(d)"
+                 @click.stop="toggleWithdrawalBarTooltip(d.year)"
+                 @keydown.enter.stop.prevent="toggleWithdrawalBarTooltip(d.year)"
+                 @keydown.space.stop.prevent="toggleWithdrawalBarTooltip(d.year)"
+                 tabindex="0"
+                 role="button"
+                 :aria-label="`Show details for year ${d.year}`">
+              <span class="tooltip">
+                <strong>Year {{d.year}} ({{ new Date().getFullYear() + d.year }})</strong><br>
+                {{d.balance.toLocaleString()}} €
+                <br>
+                <span class="gain-deposit">−{{ d.withdrawal.toLocaleString() }} € withdrawal</span>
+                <br>
+                <span class="gain-pos">
+                  +{{ d.returns.toLocaleString() }} € returns
+                </span>
+              </span>
+            </div>
+          </div>
+          <div v-if="activeWithdrawalTooltipData" class="mobile-tooltip" aria-live="polite">
+            <strong>Year {{activeWithdrawalTooltipData.year}} ({{ new Date().getFullYear() + activeWithdrawalTooltipData.year }})</strong><br>
+            {{activeWithdrawalTooltipData.balance.toLocaleString()}} €
+            <br>
+            <span class="gain-deposit">−{{ activeWithdrawalTooltipData.withdrawal.toLocaleString() }} € withdrawal</span>
+            <br>
+            <span class="gain-pos">
+              +{{ activeWithdrawalTooltipData.returns.toLocaleString() }} € returns
+            </span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <label>Starting Balance</label>
+            <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
+          </div>
+          <div class="stat-card highlighted">
+            <label>Final Balance</label>
+            <h2>{{ calculateWithdrawalData[calculateWithdrawalData.length-1]?.balance.toLocaleString() || '0' }} €</h2>
+            <span class="inflation-note">After {{ withdrawalPlanYears }} years of withdrawals</span>
+          </div>
+          <div class="stat-card monthly-card">
+            <label>Monthly Withdrawal</label>
+            <h2>{{ monthlyWithdrawalAmount.toLocaleString() }} €</h2>
+            <span class="tax-note">{{ (monthlyWithdrawalAmount * 12).toLocaleString() }} € per year</span>
+            <button @click="activeTab = 'growth'" class="btn-back">
+              ← Back to Growth Phase
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
 
 <style scoped>
 /* ============================================
@@ -1300,6 +1502,210 @@ input[type="range"]::-moz-range-thumb {
   color: hsl(var(--muted-foreground));
   opacity: 0.6;
   line-height: 1.4;
+}
+
+/* --- Tabs --- */
+.tabs-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  color: hsl(var(--muted-foreground));
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  bottom: -1px;
+}
+
+.tab-button:hover {
+  color: hsl(var(--foreground));
+}
+
+.tab-button.active {
+  color: hsl(var(--primary));
+  border-bottom-color: hsl(var(--primary));
+}
+
+/* --- View Plan Button --- */
+.btn-view-plan {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  padding: 0.65rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 0.2s ease, transform 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.btn-view-plan:hover {
+  background: hsl(var(--primary) / 0.85);
+  transform: translateY(-1px);
+}
+
+.btn-view-plan:active {
+  transform: translateY(0);
+}
+
+.btn-view-plan .arrow {
+  transition: transform 0.2s ease;
+}
+
+.btn-view-plan:hover .arrow {
+  transform: translateX(4px);
+}
+
+.plan-note {
+  display: block;
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.btn-back {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  width: 100%;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-back:hover {
+  background: hsl(var(--border));
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+/* --- Withdrawal Settings --- */
+.balance-display {
+  background: hsl(var(--muted));
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
+  margin-bottom: 0.75rem;
+}
+
+.balance-value {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+  color: hsl(var(--primary));
+}
+
+.balance-note {
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.setting-group {
+  margin-bottom: 1.25rem;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.setting-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: hsl(var(--primary));
+}
+
+.setting-help {
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  display: block;
+  margin-top: 0.3rem;
+}
+
+.setting-label-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: hsl(var(--muted-foreground));
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.setting-row input {
+  flex: 1;
+  width: auto;
+}
+
+.setting-value {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: hsl(var(--foreground));
+  min-width: 4rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Key Numbers --- */
+.key-number {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  font-size: 0.85rem;
+}
+
+.key-number:last-child {
+  border-bottom: none;
+}
+
+.key-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.key-value {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- Touch Device Behavior --- */
