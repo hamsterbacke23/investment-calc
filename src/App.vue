@@ -366,14 +366,16 @@ const monthlyWithdrawalAmount = computed(() => {
   return Math.round(totalAnnual / 12);
 });
 
+const detectTouchDevice = () => {
+  return (('ontouchstart' in window) ||
+          (navigator.maxTouchPoints > 0) ||
+          (navigator.msMaxTouchPoints > 0));
+};
+
 onMounted(() => {
   loadFromLocal();
   // Detect touch capability instead of relying on screen size
-  isTouchDevice.value = () => {
-    return (('ontouchstart' in window) ||
-            (navigator.maxTouchPoints > 0) ||
-            (navigator.msMaxTouchPoints > 0));
-  };
+  isTouchDevice.value = detectTouchDevice();
 });
 
 const exportPDF = () => {
@@ -386,7 +388,7 @@ const exportPDF = () => {
 </script>
 
 <template>
-  <div class="app-container" :class="{ 'touch-device': isTouchDevice() }" @click="activeTooltipYear = null; activeWithdrawalTooltipYear = null; closeWithdrawalRateEditor()">
+  <div class="app-container" :class="{ 'touch-device': isTouchDevice }" @click="activeTooltipYear = null; activeWithdrawalTooltipYear = null; closeWithdrawalRateEditor()">
     <header class="main-header">
       <div>
         <h1>ETF Investment Calculator</h1>
@@ -706,6 +708,8 @@ const exportPDF = () => {
         </div>
       </div>
     </main>
+  </div>
+</template>
 
 <style scoped>
 /* ============================================
