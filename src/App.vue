@@ -9,6 +9,7 @@ const initialCapital = ref(30000);
 const durationYears = ref(15);
 const reinvestGains = ref(true);
 const withdrawalRate = ref(4);
+const inflationRate = ref(2.5);
 const isEditingWithdrawalRate = ref(false);
 const yieldPhases = ref([{ id: 1, startYear: 1, endYear: 15, rate: 6, customDuration: false }]);
 const transactions = ref([{ id: 1, name: 'Savings Plan', amount: 500, type: 'monthly', startYear: 1, endYear: 15, customDuration: false }]);
@@ -29,7 +30,7 @@ const closeWithdrawalRateEditor = () => {
 
 // --- Persistence ---
 const saveToLocal = () => {
-  const data = { initialCapital: initialCapital.value, durationYears: durationYears.value, reinvestGains: reinvestGains.value, withdrawalRate: withdrawalRate.value, yieldPhases: yieldPhases.value, transactions: transactions.value };
+  const data = { initialCapital: initialCapital.value, durationYears: durationYears.value, reinvestGains: reinvestGains.value, withdrawalRate: withdrawalRate.value, inflationRate: inflationRate.value, yieldPhases: yieldPhases.value, transactions: transactions.value };
   localStorage.setItem('investment_sim_v1', JSON.stringify(data));
 };
 
@@ -43,6 +44,10 @@ const loadFromLocal = () => {
     if (parsed.withdrawalRate !== undefined) {
       const rate = Number(parsed.withdrawalRate);
       withdrawalRate.value = Number.isFinite(rate) ? Math.min(10, Math.max(1, rate)) : 4;
+    }
+    if (parsed.inflationRate !== undefined) {
+      const rate = Number(parsed.inflationRate);
+      inflationRate.value = Number.isFinite(rate) ? Math.min(20, Math.max(0, rate)) : 2.5;
     }
     yieldPhases.value = parsed.yieldPhases.map(p => {
       if (p.customDuration === undefined) p.customDuration = false;
@@ -59,7 +64,7 @@ const loadFromLocal = () => {
   }
 };
 
-watch([initialCapital, durationYears, reinvestGains, withdrawalRate, yieldPhases, transactions], () => saveToLocal(), { deep: true });
+watch([initialCapital, durationYears, reinvestGains, withdrawalRate, inflationRate, yieldPhases, transactions], () => saveToLocal(), { deep: true });
 
 // Auto-extend yield phases & transactions when total duration increases
 watch(durationYears, (newVal, oldVal) => {
@@ -211,7 +216,7 @@ const taxInfo = computed(() => {
   const taxRate = 0.26375; // 25% Abgeltungssteuer + 5.5% Soli
   const tax = Math.round(taxableAfterFreibetrag * taxRate);
   const afterTax = finalBalance - tax;
-  const inflationFactor = Math.pow(1.02, durationYears.value);
+  const inflationFactor = Math.pow(1 + inflationRate.value / 100, durationYears.value);
   const inTodaysMoney = Math.round((tax > 0 ? afterTax : finalBalance) / inflationFactor);
   const safeRate = Number.isFinite(Number(withdrawalRate.value)) ? Math.min(10, Math.max(1, Number(withdrawalRate.value))) : 4;
   const withdrawalRateDecimal = safeRate / 100;
@@ -540,6 +545,18 @@ const exportPDF = () => {
             </div>
           </div>
         </section>
+
+        <section class="card">
+          <h3>Assumptions</h3>
+          <div class="setting-group">
+            <label class="setting-label-text">Expected Inflation</label>
+            <div class="setting-row">
+              <input type="number" v-model.number="inflationRate" min="0" max="20" step="0.1" />
+              <span class="setting-value">{{ inflationRate.toFixed(1) }}%</span>
+            </div>
+            <input type="range" v-model.number="inflationRate" min="0" max="20" step="0.1" />
+          </div>
+        </section>
       </aside>
 
       <div class="dashboard">
@@ -596,7 +613,7 @@ const exportPDF = () => {
             <label>Final Balance</label>
             <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
             <span class="tax-note" v-if="taxInfo.tax > 0">After tax (DE): {{ taxInfo.afterTax.toLocaleString() }} € <small>(−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}% eff.)</small></span>
-            <span class="inflation-note">≈ {{ taxInfo.inTodaysMoney.toLocaleString() }} € in today's money <small>(2% inflation)</small></span>
+            <span class="inflation-note">≈ {{ taxInfo.inTodaysMoney.toLocaleString() }} € in today's money <small>({{ inflationRate.toFixed(1) }}% inflation)</small></span>
           </div>
           <div class="stat-card monthly-card">
             <label>View Withdrawal Plan</label>
