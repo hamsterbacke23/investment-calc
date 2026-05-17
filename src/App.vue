@@ -503,9 +503,15 @@ const exportPDF = () => {
               <button @click="toggleCustomDuration(p)" class="btn-link btn-link-reset" title="Reset to always">✕</button>
             </div>
           </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <h3>Inflation</h3>
+          </div>
           <div class="item-box">
             <div class="flex-row">
-              <span class="item-label">Inflation: {{ inflationRate.toFixed(1) }}%</span>
+              <span class="item-label">{{ inflationRate.toFixed(1) }}% / year</span>
             </div>
             <input type="range" v-model.number="inflationRate" min="0" max="20" step="0.1" />
           </div>
