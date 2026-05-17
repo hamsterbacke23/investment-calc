@@ -12,7 +12,8 @@
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "lucide-vue-next": "^0.574.0",
-    "vue": "^3.5.25"
+    "vue": "^3.5.25",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.2",
