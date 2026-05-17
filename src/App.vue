@@ -356,7 +356,7 @@ const withdrawalBarStyle = (d) => {
 
   return {
     height: heightPct + '%',
-    background: `linear-gradient(to top, var(--bar-base) ${basePct}%, var(--bar-deposit) ${basePct}% ${basePct + withdrawalPct}%, var(--bar-return) ${basePct + withdrawalPct}%)`
+    background: `linear-gradient(to top, var(--bar-base) ${basePct}%, var(--bar-return) ${basePct}% ${basePct + returnPct}%, rgba(74, 158, 168, 0.4) ${basePct + returnPct}%)`
   };
 };
 
