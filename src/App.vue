@@ -283,7 +283,7 @@ const activeTab = ref('growth'); // 'growth' or 'withdrawal'
 // --- Withdrawal Plan State ---
 const withdrawalPlanYears = ref(30);
 const allowCapitalDecay = ref(true);
-const withdrawalReturnRate = ref(3); // assumed annual return during withdrawal phase
+const withdrawalReturnRate = ref(6); // assumed annual return during withdrawal phase
 const activeWithdrawalTooltipYear = ref(null);
 
 const calculateWithdrawalData = computed(() => {
