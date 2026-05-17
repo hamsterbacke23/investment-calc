@@ -544,11 +544,7 @@ const exportPDF = () => {
               </div>
             </div>
           </div>
-        </section>
-
-        <section class="card">
-          <h3>Assumptions</h3>
-          <div class="setting-group">
+          <div class="setting-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid hsl(var(--border));">
             <label class="setting-label-text">Expected Inflation</label>
             <div class="setting-row">
               <input type="number" v-model.number="inflationRate" min="0" max="20" step="0.1" />
