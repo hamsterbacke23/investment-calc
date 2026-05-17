@@ -1,32 +1,48 @@
 <script setup>
 import { inflationRate } from '../../composables/useInvestmentStore.js';
 import { totalInvested, finalBalance, taxInfo } from '../../composables/useGrowthCalculations.js';
+import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
 </script>
 
 <template>
-  <div class="stats-grid">
+  <div class="stats-grid stats-grid--split">
     <div class="stat-card">
       <label>Total Invested</label>
       <h2>{{ totalInvested.toLocaleString() }} €</h2>
     </div>
-    <div class="stat-card highlighted">
+
+    <div class="stat-card highlighted final-balance-card">
       <label>Final Balance</label>
-      <h2>{{ finalBalance.toLocaleString() }} €</h2>
-      <span class="tax-note" v-if="taxInfo.tax > 0">
-        After tax (DE): {{ taxInfo.afterTax.toLocaleString() }} €
-        <small>(−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}% eff.)</small>
-      </span>
-      <span class="inflation-note">
-        ≈ {{ taxInfo.inTodaysMoney.toLocaleString() }} € in today's money
-        <small>({{ inflationRate.toFixed(1) }}% inflation)</small>
-      </span>
-    </div>
-    <div class="stat-card monthly-card">
-      <label>View Withdrawal Plan</label>
-      <RouterLink to="/withdrawal" class="btn-view-plan">
-        Entnahmeplan <span class="arrow">→</span>
-      </RouterLink>
-      <span class="plan-note">Calculate monthly income</span>
+      <h2 class="final-balance-headline">{{ finalBalance.toLocaleString() }} €</h2>
+
+      <dl class="balance-breakdown">
+        <div v-if="taxInfo.tax > 0" class="breakdown-row">
+          <dt>After tax <span class="muted">(DE ETF)</span></dt>
+          <dd>
+            <span class="amount">{{ taxInfo.afterTax.toLocaleString() }} €</span>
+            <span class="delta delta-neg">−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}%</span>
+          </dd>
+        </div>
+
+        <div class="breakdown-row">
+          <dt>Today's purchasing power</dt>
+          <dd>
+            <span class="amount">{{ taxInfo.inTodaysMoney.toLocaleString() }} €</span>
+            <span class="delta">at {{ inflationRate.toFixed(1) }}% inflation</span>
+          </dd>
+        </div>
+      </dl>
     </div>
   </div>
+
+  <RouterLink to="/withdrawal" class="withdrawal-cta">
+    <div class="cta-text">
+      <span class="cta-label">Plan the withdrawal phase</span>
+      <span class="cta-headline">
+        ≈ {{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} € / month
+        <span class="cta-detail">net for 30 years</span>
+      </span>
+    </div>
+    <span class="cta-arrow" aria-hidden="true">→</span>
+  </RouterLink>
 </template>
