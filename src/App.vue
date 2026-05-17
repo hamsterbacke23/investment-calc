@@ -366,6 +366,42 @@ const monthlyWithdrawalAmount = computed(() => {
   return Math.round(totalAnnual / 12);
 });
 
+// Calculate net withdrawal amounts after German taxes
+const withdrawalTaxInfo = computed(() => {
+  const grossStartBalance = calculateData.value[calculateData.value.length - 1].balance;
+  const totalInvestedAmount = initialCapital.value + transactions.value.reduce((acc, t) => {
+    const effectiveEnd = (!t.customDuration && t.type === 'monthly') ? durationYears.value : t.endYear;
+    return acc + (t.amount * (t.type === 'monthly' ? (effectiveEnd - t.startYear + 1) * 12 : 1));
+  }, 0);
+  const gains = Math.max(0, grossStartBalance - totalInvestedAmount);
+  const teilfreistellung = 0.30; // 30% tax-free for equity ETFs
+  const taxableGains = gains * (1 - teilfreistellung);
+  const freibetrag = 1000; // Sparerpauschbetrag
+  const taxableAfterFreibetrag = Math.max(0, taxableGains - freibetrag);
+  const taxRate = 0.26375; // 25% Abgeltungssteuer + 5.5% Soli
+  const totalTax = Math.round(taxableAfterFreibetrag * taxRate);
+  const netStartBalance = grossStartBalance - totalTax;
+  const monthlyGross = monthlyWithdrawalAmount.value;
+  const annualGross = monthlyGross * 12;
+  // Assuming withdrawal amounts are pro-rata from gross balance
+  const taxPercentage = totalTax / grossStartBalance;
+  const monthlyTaxPortion = Math.round(monthlyGross * taxPercentage);
+  const monthlyNet = monthlyGross - monthlyTaxPortion;
+  const annualNet = monthlyNet * 12;
+  const effectiveRate = gains > 0 ? (totalTax / gains * 100).toFixed(1) : '0.0';
+  
+  return {
+    grossStartBalance,
+    netStartBalance,
+    totalTax,
+    monthlyGross,
+    monthlyNet,
+    annualGross,
+    annualNet,
+    effectiveRate
+  };
+});
+
 const detectTouchDevice = () => {
   return (('ontouchstart' in window) ||
           (navigator.maxTouchPoints > 0) ||
@@ -690,17 +726,13 @@ const exportPDF = () => {
         <div class="stats-grid">
           <div class="stat-card">
             <label>Starting Balance</label>
-            <h2>{{ calculateData[calculateData.length-1].balance.toLocaleString() }} €</h2>
-          </div>
-          <div class="stat-card highlighted">
-            <label>Final Balance</label>
-            <h2>{{ calculateWithdrawalData[calculateWithdrawalData.length-1]?.balance.toLocaleString() || '0' }} €</h2>
-            <span class="inflation-note">After {{ withdrawalPlanYears }} years of withdrawals</span>
+            <h2>{{ withdrawalTaxInfo.netStartBalance.toLocaleString() }} €</h2>
+            <span class="tax-note">{{ withdrawalTaxInfo.grossStartBalance.toLocaleString() }} € (−{{ withdrawalTaxInfo.totalTax.toLocaleString() }} € · {{ withdrawalTaxInfo.effectiveRate }}% eff.)</span>
           </div>
           <div class="stat-card monthly-card">
             <label>Monthly Withdrawal</label>
-            <h2>{{ monthlyWithdrawalAmount.toLocaleString() }} €</h2>
-            <span class="tax-note">{{ (monthlyWithdrawalAmount * 12).toLocaleString() }} € per year</span>
+            <h2>{{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} €</h2>
+            <span class="tax-note">{{ withdrawalTaxInfo.annualNet.toLocaleString() }} € per year</span>
             <button @click="activeTab = 'growth'" class="btn-back">
               ← Back to Growth Phase
             </button>
