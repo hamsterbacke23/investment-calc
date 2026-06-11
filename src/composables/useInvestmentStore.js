@@ -2,6 +2,16 @@ import { ref, watch } from 'vue';
 
 const STORAGE_KEY = 'investment_sim_v1';
 
+// URL-safe base64 helpers (handles Unicode via TextEncoder)
+function toBase64(str) {
+  return btoa(new TextEncoder().encode(str).reduce((s, b) => s + String.fromCharCode(b), ''))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+function fromBase64(b64) {
+  const bytes = atob(b64.replace(/-/g, '+').replace(/_/g, '/')).split('').map(c => c.charCodeAt(0));
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
 // --- Growth phase state ---
 export const initialCapital = ref(30000);
 export const durationYears = ref(15);
@@ -19,6 +29,59 @@ export const withdrawalRate = ref(4);
 export const withdrawalPlanYears = ref(30);
 export const allowCapitalDecay = ref(true);
 export const withdrawalReturnRate = ref(6);
+
+// --- URL state sharing ---
+export function encodeState() {
+  const data = {
+    ic: initialCapital.value,
+    dy: durationYears.value,
+    rg: reinvestGains.value ? 1 : 0,
+    ir: inflationRate.value,
+    wr: withdrawalRate.value,
+    wpy: withdrawalPlanYears.value,
+    acd: allowCapitalDecay.value ? 1 : 0,
+    wrr: withdrawalReturnRate.value,
+    yp: yieldPhases.value.map(p => ({ s: p.startYear, e: p.endYear, r: p.rate, cd: p.customDuration ? 1 : 0 })),
+    tr: transactions.value.map(tx => ({ n: tx.name, a: tx.amount, tp: tx.type === 'monthly' ? 'm' : 'o', s: tx.startYear, e: tx.endYear, cd: tx.customDuration ? 1 : 0 })),
+  };
+  return toBase64(JSON.stringify(data));
+}
+
+function applyState(data) {
+  if (data.ic !== undefined) initialCapital.value = data.ic;
+  if (data.dy !== undefined) durationYears.value = data.dy;
+  if (data.rg !== undefined) reinvestGains.value = !!data.rg;
+  if (data.ir !== undefined) inflationRate.value = data.ir;
+  if (data.wr !== undefined) withdrawalRate.value = Math.min(10, Math.max(1, Number(data.wr)));
+  if (data.wpy !== undefined) withdrawalPlanYears.value = Math.min(80, Math.max(1, Number(data.wpy)));
+  if (data.acd !== undefined) allowCapitalDecay.value = !!data.acd;
+  if (data.wrr !== undefined) withdrawalReturnRate.value = Math.min(20, Math.max(0, Number(data.wrr)));
+  if (data.yp) {
+    yieldPhases.value = data.yp.map((p, i) => ({
+      id: i + 1, startYear: p.s, endYear: p.e, rate: p.r, customDuration: !!p.cd,
+    }));
+  }
+  if (data.tr) {
+    transactions.value = data.tr.map((t, i) => ({
+      id: i + 1, name: t.n, amount: t.a, type: t.tp === 'm' ? 'monthly' : 'onetime',
+      startYear: t.s, endYear: t.e, customDuration: !!t.cd,
+    }));
+  }
+}
+
+function loadFromUrl() {
+  const qi = window.location.hash.indexOf('?');
+  if (qi === -1) return false;
+  const encoded = new URLSearchParams(window.location.hash.slice(qi)).get('s');
+  if (!encoded) return false;
+  try {
+    applyState(JSON.parse(fromBase64(encoded)));
+    history.replaceState(null, '', window.location.pathname + window.location.hash.slice(0, qi));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // --- Persistence ---
 function saveToLocal() {
@@ -100,7 +163,7 @@ let initialized = false;
 export function initInvestmentStore() {
   if (initialized) return;
   initialized = true;
-  loadFromLocal();
+  if (!loadFromUrl()) loadFromLocal();
 
   watch(
     [
