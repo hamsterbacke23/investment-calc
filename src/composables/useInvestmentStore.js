@@ -75,8 +75,13 @@ function loadFromUrl() {
   const encoded = new URLSearchParams(window.location.hash.slice(qi)).get('s');
   if (!encoded) return false;
   try {
-    applyState(JSON.parse(fromBase64(encoded)));
+    const data = JSON.parse(fromBase64(encoded));
+    applyState(data);
     history.replaceState(null, '', window.location.pathname + window.location.hash.slice(0, qi));
+    // Update tab title so the plan is identifiable in browser history
+    if (data.ic !== undefined && data.dy !== undefined) {
+      document.title = `ETF-Rechner – ${(data.ic / 1000).toFixed(0)}k Startkapital, ${data.dy} Jahre`;
+    }
     return true;
   } catch {
     return false;
