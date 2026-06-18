@@ -7,6 +7,7 @@ import {
   removeTransaction,
   toggleCustomDuration,
 } from '../../composables/useInvestmentStore.js';
+import { formatEUR } from '../../utils/tax.js';
 </script>
 
 <template>
@@ -18,7 +19,7 @@ import {
     <div v-for="t in transactions" :key="t.id" class="item-box">
       <div class="flex-row">
         <span class="item-label">
-          {{ t.amount.toLocaleString() }} € / {{ t.type === 'monthly' ? 'Mo' : 'einmalig' }}
+          {{ formatEUR(t.amount) }} / {{ t.type === 'monthly' ? 'Mo' : 'einmalig' }}
         </span>
         <button @click="removeTransaction(t.id)" class="btn-delete"><Trash2 size="14" /></button>
       </div>

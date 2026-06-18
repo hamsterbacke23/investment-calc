@@ -29,7 +29,14 @@ export const withdrawalRate = ref(4);
 export const withdrawalPlanYears = ref(30);
 export const allowCapitalDecay = ref(true);
 export const withdrawalReturnRate = ref(6);
-export const taxCouple = ref(false);
+// Withdrawal payout shape: 'nominal' (fixed €) | 'real' (kaufkraftbereinigt, wächst mit Inflation)
+export const withdrawalMode = ref('nominal');
+
+// --- Pension (Gesetzliche Rente) ---
+// pensionMonthly is given in today's purchasing power (€/Monat).
+export const pensionMonthly = ref(0);
+export const pensionStartAge = ref(67);
+export const withdrawalStartAge = ref(60);
 
 // --- URL state sharing ---
 export function encodeState() {
@@ -42,7 +49,10 @@ export function encodeState() {
     wpy: withdrawalPlanYears.value,
     acd: allowCapitalDecay.value ? 1 : 0,
     wrr: withdrawalReturnRate.value,
-    tc: taxCouple.value ? 1 : 0,
+    wm: withdrawalMode.value,
+    pm: pensionMonthly.value,
+    psa: pensionStartAge.value,
+    wsa: withdrawalStartAge.value,
     yp: yieldPhases.value.map(p => ({ s: p.startYear, e: p.endYear, r: p.rate, cd: p.customDuration ? 1 : 0 })),
     tr: transactions.value.map(tx => ({ n: tx.name, a: tx.amount, tp: tx.type === 'monthly' ? 'm' : 'o', s: tx.startYear, e: tx.endYear, cd: tx.customDuration ? 1 : 0 })),
   };
@@ -58,7 +68,10 @@ function applyState(data) {
   if (data.wpy !== undefined) withdrawalPlanYears.value = Math.min(80, Math.max(1, Number(data.wpy)));
   if (data.acd !== undefined) allowCapitalDecay.value = !!data.acd;
   if (data.wrr !== undefined) withdrawalReturnRate.value = Math.min(20, Math.max(0, Number(data.wrr)));
-  if (data.tc !== undefined) taxCouple.value = !!data.tc;
+  if (data.wm === 'real' || data.wm === 'nominal') withdrawalMode.value = data.wm;
+  if (data.pm !== undefined) pensionMonthly.value = Math.max(0, Number(data.pm) || 0);
+  if (data.psa !== undefined) pensionStartAge.value = Math.min(80, Math.max(50, Number(data.psa) || 67));
+  if (data.wsa !== undefined) withdrawalStartAge.value = Math.min(90, Math.max(30, Number(data.wsa) || 60));
   if (data.yp) {
     yieldPhases.value = data.yp.map((p, i) => ({
       id: i + 1, startYear: p.s, endYear: p.e, rate: p.r, customDuration: !!p.cd,
@@ -104,7 +117,10 @@ function saveToLocal() {
     withdrawalPlanYears: withdrawalPlanYears.value,
     allowCapitalDecay: allowCapitalDecay.value,
     withdrawalReturnRate: withdrawalReturnRate.value,
-    taxCouple: taxCouple.value,
+    withdrawalMode: withdrawalMode.value,
+    pensionMonthly: pensionMonthly.value,
+    pensionStartAge: pensionStartAge.value,
+    withdrawalStartAge: withdrawalStartAge.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -134,7 +150,21 @@ export function loadFromLocal() {
       const rate = Number(parsed.withdrawalReturnRate);
       withdrawalReturnRate.value = Number.isFinite(rate) ? Math.min(20, Math.max(0, rate)) : 6;
     }
-    if (parsed.taxCouple !== undefined) taxCouple.value = !!parsed.taxCouple;
+    if (parsed.withdrawalMode === 'real' || parsed.withdrawalMode === 'nominal') {
+      withdrawalMode.value = parsed.withdrawalMode;
+    }
+    if (parsed.pensionMonthly !== undefined) {
+      const v = Number(parsed.pensionMonthly);
+      pensionMonthly.value = Number.isFinite(v) ? Math.max(0, v) : 0;
+    }
+    if (parsed.pensionStartAge !== undefined) {
+      const v = Number(parsed.pensionStartAge);
+      pensionStartAge.value = Number.isFinite(v) ? Math.min(80, Math.max(50, v)) : 67;
+    }
+    if (parsed.withdrawalStartAge !== undefined) {
+      const v = Number(parsed.withdrawalStartAge);
+      withdrawalStartAge.value = Number.isFinite(v) ? Math.min(90, Math.max(30, v)) : 60;
+    }
     yieldPhases.value = parsed.yieldPhases.map((p) => {
       if (p.customDuration === undefined) p.customDuration = false;
       return p;
@@ -187,7 +217,10 @@ export function initInvestmentStore() {
       withdrawalPlanYears,
       allowCapitalDecay,
       withdrawalReturnRate,
-      taxCouple,
+      withdrawalMode,
+      pensionMonthly,
+      pensionStartAge,
+      withdrawalStartAge,
     ],
     () => saveToLocal(),
     { deep: true },

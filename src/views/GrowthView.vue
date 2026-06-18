@@ -6,7 +6,13 @@ import DepositsCard from '../components/growth/DepositsCard.vue';
 import GrowthStats from '../components/growth/GrowthStats.vue';
 import BarChart from '../components/BarChart.vue';
 import BenchmarkSection from '../components/BenchmarkSection.vue';
-import { calculateData, barStyle } from '../composables/useGrowthCalculations.js';
+import { calculateData, barStyle, maxBalance } from '../composables/useGrowthCalculations.js';
+
+const legend = [
+  { label: 'Bestand', color: 'var(--bar-base)' },
+  { label: 'Einzahlungen', color: 'var(--bar-deposit)' },
+  { label: 'Rendite', color: 'var(--bar-return)' },
+];
 </script>
 
 <template>
@@ -19,7 +25,14 @@ import { calculateData, barStyle } from '../composables/useGrowthCalculations.js
     </aside>
 
     <div class="dashboard">
-      <BarChart :data="calculateData" :bar-style-fn="barStyle" variant="growth" />
+      <BarChart
+        :data="calculateData"
+        :bar-style-fn="barStyle"
+        variant="growth"
+        :max-value="maxBalance"
+        :legend="legend"
+        caption="Jahr · Depotstand (nominal)"
+      />
       <GrowthStats />
     </div>
   </main>
