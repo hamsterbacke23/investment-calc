@@ -12,13 +12,19 @@ const monthlyTax = computed(() =>
   withdrawalTaxInfo.value.monthlyGross - withdrawalTaxInfo.value.monthlyNet,
 );
 
-const monthlyNetToday = computed(() =>
-  Math.round(
-    inflationAdjusted(
-      withdrawalTaxInfo.value.monthlyNet,
-      inflationRate.value,
-      durationYears.value,
-    ),
+const monthlyNetTodayStart = computed(() =>
+  inflationAdjusted(
+    withdrawalTaxInfo.value.monthlyNet,
+    inflationRate.value,
+    durationYears.value,
+  ),
+);
+
+const monthlyNetTodayEnd = computed(() =>
+  inflationAdjusted(
+    withdrawalTaxInfo.value.monthlyNetEnd,
+    inflationRate.value,
+    durationYears.value + withdrawalTaxInfo.value.lastYear - 1,
   ),
 );
 </script>
@@ -61,10 +67,10 @@ const monthlyNetToday = computed(() =>
         </div>
 
         <div class="breakdown-row">
-          <dt>Heutige Kaufkraft</dt>
+          <dt>Heutige Kaufkraft <span class="muted">Jahr 1 → {{ withdrawalTaxInfo.lastYear }}</span></dt>
           <dd>
             <span class="delta">bei {{ inflationRate.toFixed(1) }}% Inflation</span>
-            <span class="amount">{{ monthlyNetToday.toLocaleString() }} €</span>
+            <span class="amount">{{ monthlyNetTodayStart.toLocaleString() }} € → {{ monthlyNetTodayEnd.toLocaleString() }} €</span>
           </dd>
         </div>
       </dl>

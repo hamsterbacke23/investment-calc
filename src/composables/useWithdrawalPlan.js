@@ -80,8 +80,11 @@ export const withdrawalTaxInfo = computed(() => {
     return {
       monthlyGross: 0,
       monthlyNet: 0,
+      monthlyNetEnd: 0,
       annualGross: 0,
       annualNet: 0,
+      annualNetEnd: 0,
+      lastYear: 0,
       totalTax: 0,
       totalRealizedGain: 0,
       effectiveRate: '0.0',
@@ -90,21 +93,25 @@ export const withdrawalTaxInfo = computed(() => {
     };
   }
   const first = rows[0];
+  const last = rows[rows.length - 1];
   const totalTax = rows.reduce((acc, r) => acc + r.tax, 0);
   const totalRealizedGain = rows.reduce((acc, r) => acc + r.realizedGain, 0);
   const depletionRow = rows.find((r) => r.depleted);
   return {
     monthlyGross: Math.round(first.withdrawal / 12),
     monthlyNet: Math.round(first.net / 12),
+    monthlyNetEnd: Math.round(last.net / 12),
     annualGross: first.withdrawal,
     annualNet: first.net,
+    annualNetEnd: last.net,
+    lastYear: last.year,
     totalTax: Math.round(totalTax),
     totalRealizedGain: Math.round(totalRealizedGain),
     effectiveRate:
       totalRealizedGain > 0
         ? ((totalTax / totalRealizedGain) * 100).toFixed(1)
         : '0.0',
-    endBalance: rows[rows.length - 1].balance,
+    endBalance: last.balance,
     depletionYear: depletionRow ? depletionRow.year : null,
   };
 });
