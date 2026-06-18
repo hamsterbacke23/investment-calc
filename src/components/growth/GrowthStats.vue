@@ -1,6 +1,6 @@
 <script setup>
-import { inflationRate, withdrawalPlanYears } from '../../composables/useInvestmentStore.js';
-import { totalInvested, finalBalance, taxInfo } from '../../composables/useGrowthCalculations.js';
+import { inflationRate, withdrawalPlanYears, durationYears } from '../../composables/useInvestmentStore.js';
+import { totalInvested, finalBalance, finalBalanceReal } from '../../composables/useGrowthCalculations.js';
 import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
 </script>
 
@@ -16,19 +16,11 @@ import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
       <h2 class="final-balance-headline">{{ finalBalance.toLocaleString() }} €</h2>
 
       <dl class="balance-breakdown">
-        <div v-if="taxInfo.tax > 0" class="breakdown-row">
-          <dt>Nach Steuern <span class="muted">(DE-ETF)</span></dt>
-          <dd>
-            <span class="delta delta-neg">−{{ taxInfo.tax.toLocaleString() }} € · {{ taxInfo.effectiveRate }}%</span>
-            <span class="amount">{{ taxInfo.afterTax.toLocaleString() }} €</span>
-          </dd>
-        </div>
-
         <div class="breakdown-row">
           <dt>Heutige Kaufkraft</dt>
           <dd>
-            <span class="delta">bei {{ inflationRate.toFixed(1) }}% Inflation</span>
-            <span class="amount">{{ taxInfo.inTodaysMoney.toLocaleString() }} €</span>
+            <span class="delta">bei {{ inflationRate.toFixed(1) }}% Inflation über {{ durationYears }} Jahre</span>
+            <span class="amount">{{ finalBalanceReal.toLocaleString() }} €</span>
           </dd>
         </div>
       </dl>

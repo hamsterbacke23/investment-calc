@@ -58,7 +58,12 @@ defineExpose({ clearTooltip });
           </template>
           <template v-else>
             <br>
-            <span class="gain-deposit">−{{ d.withdrawal.toLocaleString() }} € Entnahme</span>
+            <span class="gain-deposit">−{{ d.withdrawal.toLocaleString() }} € Brutto</span>
+            <br>
+            <span v-if="d.tax > 0" class="gain-neg">−{{ d.tax.toLocaleString() }} € Steuer auf Gewinn</span>
+            <span v-else class="gain-pos">Steuerfrei (Freibetrag)</span>
+            <br>
+            <span class="gain-total">= {{ d.net.toLocaleString() }} € netto</span>
             <br>
             <span class="gain-pos">+{{ d.returns.toLocaleString() }} € Rendite</span>
           </template>
@@ -82,7 +87,12 @@ defineExpose({ clearTooltip });
       </template>
       <template v-else>
         <br>
-        <span class="gain-deposit">−{{ activeData.withdrawal.toLocaleString() }} € Entnahme</span>
+        <span class="gain-deposit">−{{ activeData.withdrawal.toLocaleString() }} € Brutto</span>
+        <br>
+        <span v-if="activeData.tax > 0" class="gain-neg">−{{ activeData.tax.toLocaleString() }} € Steuer auf Gewinn</span>
+        <span v-else class="gain-pos">Steuerfrei (Freibetrag)</span>
+        <br>
+        <span class="gain-total">= {{ activeData.net.toLocaleString() }} € netto</span>
         <br>
         <span class="gain-pos">+{{ activeData.returns.toLocaleString() }} € Rendite</span>
       </template>

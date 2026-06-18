@@ -3,6 +3,7 @@ import {
   allowCapitalDecay,
   withdrawalPlanYears,
   withdrawalReturnRate,
+  taxCouple,
 } from '../../composables/useInvestmentStore.js';
 </script>
 
@@ -16,6 +17,16 @@ import {
       </label>
       <span class="setting-help">
         {{ allowCapitalDecay ? 'Gesamtes Kapital inkl. Stamm wird entnommen' : 'Nur Renditen werden entnommen' }}
+      </span>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label">
+        <input type="checkbox" v-model="taxCouple" />
+        <span>Gemeinsam veranlagt (Paar)</span>
+      </label>
+      <span class="setting-help">
+        Sparerpauschbetrag: {{ taxCouple ? '2.000' : '1.000' }} € pro Jahr
       </span>
     </div>
 

@@ -28,7 +28,23 @@ const monthlyNetToday = computed(() =>
     <div class="stat-card">
       <label>Jährliches Nettoeinkommen</label>
       <h2>{{ withdrawalTaxInfo.annualNet.toLocaleString() }} €</h2>
-      <span class="tax-note">über {{ withdrawalPlanYears }} Jahre</span>
+      <span class="tax-note">Jahr 1 · über {{ withdrawalPlanYears }} Jahre</span>
+
+      <dl class="balance-breakdown">
+        <div v-if="withdrawalTaxInfo.totalTax > 0" class="breakdown-row">
+          <dt>Steuern gesamt <span class="muted">(Lebenszeit)</span></dt>
+          <dd>
+            <span class="delta delta-neg">∅ {{ withdrawalTaxInfo.effectiveRate }}% auf Gewinne</span>
+            <span class="amount">{{ withdrawalTaxInfo.totalTax.toLocaleString() }} €</span>
+          </dd>
+        </div>
+        <div v-if="withdrawalTaxInfo.depletionYear" class="breakdown-row">
+          <dt>Kapital erschöpft</dt>
+          <dd>
+            <span class="delta delta-neg">nach {{ withdrawalTaxInfo.depletionYear }} Jahren</span>
+          </dd>
+        </div>
+      </dl>
     </div>
 
     <div class="stat-card highlighted final-balance-card">
@@ -36,10 +52,10 @@ const monthlyNetToday = computed(() =>
       <h2 class="final-balance-headline">{{ withdrawalTaxInfo.monthlyNet.toLocaleString() }} €</h2>
 
       <dl class="balance-breakdown">
-        <div v-if="withdrawalTaxInfo.totalTax > 0" class="breakdown-row">
+        <div v-if="monthlyTax > 0" class="breakdown-row">
           <dt>Brutto monatlich <span class="muted">(vor Steuern)</span></dt>
           <dd>
-            <span class="delta delta-neg">−{{ monthlyTax.toLocaleString() }} € Steuern · {{ withdrawalTaxInfo.effectiveRate }}%</span>
+            <span class="delta delta-neg">−{{ monthlyTax.toLocaleString() }} € Steuer auf Gewinn</span>
             <span class="amount">{{ withdrawalTaxInfo.monthlyGross.toLocaleString() }} €</span>
           </dd>
         </div>

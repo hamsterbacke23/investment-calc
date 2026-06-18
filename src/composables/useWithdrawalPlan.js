@@ -1,52 +1,70 @@
 import { computed } from 'vue';
 import {
-  initialCapital,
-  durationYears,
-  transactions,
   allowCapitalDecay,
   withdrawalPlanYears,
   withdrawalReturnRate,
+  taxCouple,
 } from './useInvestmentStore.js';
-import { calculateTax } from '../utils/tax.js';
-import { calculateData, finalBalance } from './useGrowthCalculations.js';
+import { EFFECTIVE_GAIN_TAX_RATE, freibetragFor } from '../utils/tax.js';
+import { finalBalance, totalInvested } from './useGrowthCalculations.js';
 
 export const calculateWithdrawalData = computed(() => {
   const startingBalance = finalBalance.value;
+  const startingBasis = Math.min(totalInvested.value, startingBalance);
   const results = [];
-  let currentBalance = startingBalance;
+
+  let depot = startingBalance;
+  let basis = startingBasis;
   const monthlyReturnRate = Math.pow(1 + withdrawalReturnRate.value / 100, 1 / 12) - 1;
   const nMonths = withdrawalPlanYears.value * 12;
-  const monthlyWithdrawal = allowCapitalDecay.value
+  const monthlyGross = allowCapitalDecay.value
     ? Math.round(
-        currentBalance /
+        depot /
           (((1 - Math.pow(1 + monthlyReturnRate, -nMonths)) / monthlyReturnRate) || nMonths),
       )
-    : Math.round((currentBalance * (withdrawalReturnRate.value / 100)) / 12);
+    : Math.round((depot * (withdrawalReturnRate.value / 100)) / 12);
+
+  const pauschbetrag = freibetragFor(taxCouple.value);
+  const T = EFFECTIVE_GAIN_TAX_RATE;
 
   for (let year = 1; year <= withdrawalPlanYears.value; year++) {
     let yearWithdrawals = 0;
     let yearReturns = 0;
+    let yearRealizedGain = 0;
 
     for (let month = 1; month <= 12; month++) {
-      const monthlyReturn = currentBalance * monthlyReturnRate;
+      const monthlyReturn = depot * monthlyReturnRate;
       yearReturns += monthlyReturn;
-      currentBalance += monthlyReturn;
+      depot += monthlyReturn;
 
-      if (currentBalance > 0) {
-        const withdrawal = Math.min(monthlyWithdrawal, currentBalance);
-        currentBalance -= withdrawal;
+      if (depot > 0) {
+        const withdrawal = Math.min(monthlyGross, depot);
+        const g = Math.max(0, (depot - basis) / depot);
+        const realized = withdrawal * g;
+        const principalPart = withdrawal - realized;
+        yearRealizedGain += realized;
+        basis = Math.max(0, basis - principalPart);
+        depot -= withdrawal;
         yearWithdrawals += withdrawal;
       }
     }
 
+    const taxableGain = Math.max(0, yearRealizedGain - pauschbetrag);
+    const yearTax = taxableGain * T;
+    const yearNet = yearWithdrawals - yearTax;
+
     results.push({
       year,
-      balance: Math.round(currentBalance),
+      balance: Math.round(depot),
       withdrawal: Math.round(yearWithdrawals),
       returns: Math.round(yearReturns),
+      realizedGain: Math.round(yearRealizedGain),
+      tax: Math.round(yearTax),
+      net: Math.round(yearNet),
+      depleted: depot <= 0,
     });
 
-    if (currentBalance <= 0) break;
+    if (depot <= 0) break;
   }
   return results;
 });
@@ -56,39 +74,38 @@ export const maxWithdrawalBalance = computed(() => {
   return Math.max(...values, 1);
 });
 
-export const monthlyWithdrawalAmount = computed(() => {
-  if (calculateWithdrawalData.value.length === 0) return 0;
-  const totalAnnual = calculateWithdrawalData.value[0].withdrawal;
-  return Math.round(totalAnnual / 12);
-});
-
 export const withdrawalTaxInfo = computed(() => {
-  const grossStartBalance = finalBalance.value;
-  const totalInvestedAmount =
-    initialCapital.value +
-    transactions.value.reduce((acc, t) => {
-      const effectiveEnd =
-        !t.customDuration && t.type === 'monthly' ? durationYears.value : t.endYear;
-      return acc + (t.amount * (t.type === 'monthly' ? (effectiveEnd - t.startYear + 1) * 12 : 1));
-    }, 0);
-  const { tax: totalTax, effectiveRate } = calculateTax(grossStartBalance, totalInvestedAmount);
-  const netStartBalance = grossStartBalance - totalTax;
-  const monthlyGross = monthlyWithdrawalAmount.value;
-  const annualGross = monthlyGross * 12;
-  const taxPercentage = grossStartBalance > 0 ? totalTax / grossStartBalance : 0;
-  const monthlyTaxPortion = Math.round(monthlyGross * taxPercentage);
-  const monthlyNet = monthlyGross - monthlyTaxPortion;
-  const annualNet = monthlyNet * 12;
-
+  const rows = calculateWithdrawalData.value;
+  if (rows.length === 0) {
+    return {
+      monthlyGross: 0,
+      monthlyNet: 0,
+      annualGross: 0,
+      annualNet: 0,
+      totalTax: 0,
+      totalRealizedGain: 0,
+      effectiveRate: '0.0',
+      endBalance: finalBalance.value,
+      depletionYear: null,
+    };
+  }
+  const first = rows[0];
+  const totalTax = rows.reduce((acc, r) => acc + r.tax, 0);
+  const totalRealizedGain = rows.reduce((acc, r) => acc + r.realizedGain, 0);
+  const depletionRow = rows.find((r) => r.depleted);
   return {
-    grossStartBalance,
-    netStartBalance,
-    totalTax,
-    monthlyGross,
-    monthlyNet,
-    annualGross,
-    annualNet,
-    effectiveRate,
+    monthlyGross: Math.round(first.withdrawal / 12),
+    monthlyNet: Math.round(first.net / 12),
+    annualGross: first.withdrawal,
+    annualNet: first.net,
+    totalTax: Math.round(totalTax),
+    totalRealizedGain: Math.round(totalRealizedGain),
+    effectiveRate:
+      totalRealizedGain > 0
+        ? ((totalTax / totalRealizedGain) * 100).toFixed(1)
+        : '0.0',
+    endBalance: rows[rows.length - 1].balance,
+    depletionYear: depletionRow ? depletionRow.year : null,
   };
 });
 
@@ -105,6 +122,3 @@ export function withdrawalBarStyle(d) {
     background: `linear-gradient(to top, var(--bar-base) ${basePct}%, var(--bar-return) ${basePct}% ${basePct + returnPct}%, rgba(74, 158, 168, 0.4) ${basePct + returnPct}%)`,
   };
 }
-
-// Re-export for convenience
-export { calculateData };

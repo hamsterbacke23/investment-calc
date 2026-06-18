@@ -29,6 +29,7 @@ export const withdrawalRate = ref(4);
 export const withdrawalPlanYears = ref(30);
 export const allowCapitalDecay = ref(true);
 export const withdrawalReturnRate = ref(6);
+export const taxCouple = ref(false);
 
 // --- URL state sharing ---
 export function encodeState() {
@@ -41,6 +42,7 @@ export function encodeState() {
     wpy: withdrawalPlanYears.value,
     acd: allowCapitalDecay.value ? 1 : 0,
     wrr: withdrawalReturnRate.value,
+    tc: taxCouple.value ? 1 : 0,
     yp: yieldPhases.value.map(p => ({ s: p.startYear, e: p.endYear, r: p.rate, cd: p.customDuration ? 1 : 0 })),
     tr: transactions.value.map(tx => ({ n: tx.name, a: tx.amount, tp: tx.type === 'monthly' ? 'm' : 'o', s: tx.startYear, e: tx.endYear, cd: tx.customDuration ? 1 : 0 })),
   };
@@ -56,6 +58,7 @@ function applyState(data) {
   if (data.wpy !== undefined) withdrawalPlanYears.value = Math.min(80, Math.max(1, Number(data.wpy)));
   if (data.acd !== undefined) allowCapitalDecay.value = !!data.acd;
   if (data.wrr !== undefined) withdrawalReturnRate.value = Math.min(20, Math.max(0, Number(data.wrr)));
+  if (data.tc !== undefined) taxCouple.value = !!data.tc;
   if (data.yp) {
     yieldPhases.value = data.yp.map((p, i) => ({
       id: i + 1, startYear: p.s, endYear: p.e, rate: p.r, customDuration: !!p.cd,
@@ -101,6 +104,7 @@ function saveToLocal() {
     withdrawalPlanYears: withdrawalPlanYears.value,
     allowCapitalDecay: allowCapitalDecay.value,
     withdrawalReturnRate: withdrawalReturnRate.value,
+    taxCouple: taxCouple.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -130,6 +134,7 @@ export function loadFromLocal() {
       const rate = Number(parsed.withdrawalReturnRate);
       withdrawalReturnRate.value = Number.isFinite(rate) ? Math.min(20, Math.max(0, rate)) : 6;
     }
+    if (parsed.taxCouple !== undefined) taxCouple.value = !!parsed.taxCouple;
     yieldPhases.value = parsed.yieldPhases.map((p) => {
       if (p.customDuration === undefined) p.customDuration = false;
       return p;
@@ -182,6 +187,7 @@ export function initInvestmentStore() {
       withdrawalPlanYears,
       allowCapitalDecay,
       withdrawalReturnRate,
+      taxCouple,
     ],
     () => saveToLocal(),
     { deep: true },

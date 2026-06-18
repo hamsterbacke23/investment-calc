@@ -4,11 +4,10 @@ import {
   durationYears,
   reinvestGains,
   inflationRate,
-  withdrawalRate,
   yieldPhases,
   transactions,
 } from './useInvestmentStore.js';
-import { calculateTax, inflationAdjusted } from '../utils/tax.js';
+import { inflationAdjusted } from '../utils/tax.js';
 import { etfData } from '../data/etfBenchmarks.js';
 
 export const calculateData = computed(() => {
@@ -75,31 +74,9 @@ export const totalInvested = computed(() => {
 
 export const finalBalance = computed(() => calculateData.value[calculateData.value.length - 1].balance);
 
-export const taxInfo = computed(() => {
-  const fb = finalBalance.value;
-  const { gains, tax, afterTax, effectiveRate } = calculateTax(fb, totalInvested.value);
-  const inTodaysMoney = inflationAdjusted(tax > 0 ? afterTax : fb, inflationRate.value, durationYears.value);
-  const safeRate = Number.isFinite(Number(withdrawalRate.value))
-    ? Math.min(10, Math.max(1, Number(withdrawalRate.value)))
-    : 4;
-  const withdrawalRateDecimal = safeRate / 100;
-  const withdrawalAnnualNominal = Math.round(fb * withdrawalRateDecimal);
-  const withdrawalAnnualAfterTax = Math.round(afterTax * withdrawalRateDecimal);
-  const withdrawalAnnualReal = Math.round(inTodaysMoney * withdrawalRateDecimal);
-  return {
-    gains,
-    tax,
-    afterTax,
-    inTodaysMoney,
-    withdrawalAnnualNominal,
-    withdrawalMonthlyNominal: Math.round(withdrawalAnnualNominal / 12),
-    withdrawalAnnualAfterTax,
-    withdrawalMonthlyAfterTax: Math.round(withdrawalAnnualAfterTax / 12),
-    withdrawalAnnualReal,
-    withdrawalMonthlyReal: Math.round(withdrawalAnnualReal / 12),
-    effectiveRate,
-  };
-});
+export const finalBalanceReal = computed(() =>
+  inflationAdjusted(finalBalance.value, inflationRate.value, durationYears.value),
+);
 
 export const etfBenchmarks = computed(() => {
   const endYear = 2025;
