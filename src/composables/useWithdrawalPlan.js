@@ -457,6 +457,7 @@ function emptySummary() {
     vpwWorst5DropPct: 0, vpwIncomeP10Late: 0, vpwLateAge: 0,
     endBalanceReal: finalBalance.value,
     bridgeActive: false,
+    phases: [],
   };
 }
 
@@ -479,6 +480,29 @@ function buildSummary(d) {
   const pensionStarts = pmToday > 0 ? yearsUntilPension + 1 : null;
 
   const withdrawalRatePct = depot0 > 0 ? ((monthlyW1 * 12) / depot0 * 100).toFixed(1) : '0.0';
+
+  // --- Life-phase income breakdown (all monthly, net, today's purchasing power) ---
+  // Each phase reports the TOTAL income (depot + pension); split shown beneath.
+  const totalAtYear = (year) => {
+    if (isDynamic && ib.length >= year && ib[year - 1]) return ib[year - 1].p50;
+    const r = rows[year - 1];
+    return r ? Math.round(r.totalNetReal / 12) : 0;
+  };
+  const pensionRealMonthly = firstPensionRow ? Math.round(firstPensionRow.pensionReal / 12) : 0;
+  const startAge = withdrawalStartAge.value;
+  const psaV = pensionStartAge.value;
+  const endAge = startAge + n - 1;
+  const phases = [];
+  if (pmToday > 0 && yearsUntilPension > 0 && yearsUntilPension < n) {
+    phases.push({ label: 'Vor Rente', age: `${startAge}–${psaV - 1}`, total: totalAtYear(1), pension: 0 });
+    phases.push({ label: 'Ab Rentenbeginn', age: `ab ${psaV}`, total: totalAtYear(yearsUntilPension + 1), pension: pensionRealMonthly });
+    phases.push({ label: 'Ende der Laufzeit', age: `mit ${endAge} · Median`, total: totalAtYear(n), pension: pensionRealMonthly });
+  } else {
+    const startPension = pmToday > 0 ? pensionRealMonthly : 0;
+    phases.push({ label: 'Start', age: `mit ${startAge}`, total: totalAtYear(1), pension: startPension });
+    phases.push({ label: 'Ende der Laufzeit', age: `mit ${endAge} · Median`, total: totalAtYear(n), pension: startPension });
+  }
+  phases.forEach((p) => { p.depot = Math.max(0, p.total - p.pension); });
 
   return {
     monthlyGross: Math.round(first.withdrawal / 12),
@@ -537,6 +561,7 @@ function buildSummary(d) {
     vpwLateAge: d.vpwLateAge || 0,
     endBalanceReal: d.medianEndBalanceReal != null ? d.medianEndBalanceReal : d.medianEndBalance,
     bridgeActive: !!d.bridge,
+    phases,
   };
 }
 

@@ -1701,6 +1701,85 @@ input[type="range"]::-moz-range-thumb {
 
 .hero-income { display: flex; flex-direction: column; }
 
+/* --- Life-phase income card --- */
+.hero-klartext {
+  margin: 0.35rem 0 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: hsl(var(--foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+.phase-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.phase-row {
+  padding: 0.7rem 0;
+  border-top: 1px solid hsl(var(--border));
+}
+.phase-row:first-child { border-top: none; padding-top: 0; }
+
+.phase-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.phase-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: hsl(var(--muted-foreground));
+}
+
+.phase-age {
+  font-size: 0.68rem;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.phase-dd { margin: 0.1rem 0 0; display: flex; flex-direction: column; gap: 0.05rem; }
+
+.phase-total {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.7rem;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: hsl(var(--primary));
+  font-variant-numeric: tabular-nums;
+}
+
+.phase-total .per-month {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
+}
+
+.phase-split {
+  margin: 0;
+  font-size: 0.74rem;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-trend {
+  margin: 0.9rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid hsl(var(--border));
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
 .hero-progression {
   display: flex;
   align-items: baseline;

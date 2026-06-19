@@ -1,14 +1,10 @@
 <script setup>
 import { computed } from 'vue';
-import { inflationRate, allowCapitalDecay } from '../../composables/useInvestmentStore.js';
+import { allowCapitalDecay } from '../../composables/useInvestmentStore.js';
 import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
-import { formatEUR } from '../../utils/tax.js';
+import { formatEUR, formatNumber } from '../../utils/tax.js';
 
 const info = computed(() => withdrawalTaxInfo.value);
-
-// All hero-card figures are in today's purchasing power (real), matching the
-// card's "heutige Kaufkraft" framing; the nominal trajectory lives in the chart.
-const monthlyTax = computed(() => info.value.monthlyTaxReal);
 
 // How safe is the plan? Drives the colour of the headline success number.
 const successTone = computed(() => {
@@ -53,6 +49,50 @@ const capitalNote = computed(() => {
   if (t.depletedEarly) return 'in ungünstigen Märkten vorzeitig erschöpft';
   if (allowCapitalDecay.value) return 'Verzehr erlaubt – Puffer bleibt im Normalfall';
   return t.mode === 'real' ? 'real erhalten' : 'nominal erhalten';
+});
+
+// Plain-language headline: the available monthly TOTAL income (range) + trend.
+const klartext = computed(() => {
+  const t = info.value;
+  const ph = t.phases || [];
+  if (!ph.length) return '';
+  // Range over the "living" phases (everything but the final year); the end is
+  // stated separately so a decline to the end isn't hidden inside the range.
+  const early = (ph.length > 1 ? ph.slice(0, -1) : ph).map((p) => p.total);
+  const end = ph[ph.length - 1].total;
+  const lo = Math.min(...early);
+  const hi = Math.max(...early);
+  const penTxt = t.hasPension ? `, inkl. Rente ab ${t.pensionStartAge}` : '';
+  const head = hi - lo > Math.max(150, hi * 0.04)
+    ? `~${formatNumber(lo)}–${formatNumber(hi)} €`
+    : `~${formatNumber(hi)} €`;
+  let tail = '';
+  if (end < lo * 0.97) tail = ` Sinkt bis zum Ende auf ~${formatNumber(end)} €.`;
+  else if (end > hi * 1.03) tail = ` Steigt bis zum Ende auf ~${formatNumber(end)} €.`;
+  return `Monatlich verfügbar: ${head} — netto, heutiges Geld${penTxt}.${tail}`;
+});
+
+// One sentence tying the number to the curve shape in the chart.
+const shapeNote = computed(() => {
+  const t = info.value;
+  if (!(t.phases || []).length) return '';
+  const hasGap = t.phases.some((p) => p.label === 'Vor Rente');
+  if (t.isDynamic) {
+    if (hasGap) {
+      return t.bridgeActive
+        ? `Kurve: die Brücke verhindert den Einkommenssprung bei Rentenbeginn (${t.pensionStartAge}); insgesamt sinkt das Einkommen langsam, weil das Depot planmäßig aufgezehrt wird.`
+        : `Kurve: steigt bei Rentenbeginn (${t.pensionStartAge}, die Rente kommt dazu), sinkt sonst langsam, weil das Depot planmäßig aufgezehrt wird.`;
+    }
+    return 'Kurve: sinkt langsam, weil das Depot planmäßig aufgezehrt wird (Volatility Drag).';
+  }
+  if (t.mode === 'real') {
+    return hasGap
+      ? `Kurve: konstante reale Auszahlung, steigt nur bei Rentenbeginn (${t.pensionStartAge}).`
+      : 'Kurve: konstante reale Auszahlung über die ganze Laufzeit.';
+  }
+  return t.hasPension
+    ? `Kurve: nominal fester Betrag – reale Kaufkraft sinkt; Rente ab ${t.pensionStartAge}.`
+    : 'Kurve: nominal fester Betrag – reale Kaufkraft sinkt über die Zeit.';
 });
 </script>
 
@@ -118,69 +158,30 @@ const capitalNote = computed(() => {
     </div>
 
     <div class="stat-card highlighted hero-income">
-      <label>Monatliches Einkommen · heutige Kaufkraft</label>
+      <label>Monatliches Einkommen · netto · heutige Kaufkraft</label>
 
-      <div class="hero-progression" :aria-label="`von ${formatEUR(info.monthlyRealStart)} auf ${formatEUR(info.monthlyRealEnd)}`">
-        <span class="hero-now">{{ formatEUR(info.monthlyRealStart) }}</span>
-        <span class="hero-arrow" aria-hidden="true">→</span>
-        <span class="hero-later">{{ formatEUR(info.monthlyRealEnd) }}</span>
-      </div>
-      <span class="hero-caption">
-        Jahr 1 → Jahr {{ info.lastYear }} · bei {{ inflationRate.toFixed(1) }}% Inflation<template v-if="info.mode === 'real'"> · Entnahme wächst mit der Inflation</template><template v-else-if="info.mode === 'dynamic'"> · Median; Entnahme folgt dem Depot (VPW)</template>
-      </span>
+      <p class="hero-klartext">{{ klartext }}</p>
 
-      <p
-        v-if="isDynamic && info.monthlyRealEnd < info.monthlyRealStart"
-        class="drag-note"
-        title="Der Median-Verlauf liegt unter dem Mittelwert, weil Schwankung die typische (geometrische) Rendite drückt – und weil die Kalkulations-Rendite g über der Marktrendite liegt. Ein niedrigeres g glättet den Verlauf."
-      >
-        Der Median sinkt mit der Zeit – das ist normal (Volatility Drag + g über Marktrendite), kein Fehler. Niedrigeres g = gleichmäßiger.
-      </p>
-
-      <p v-if="info.hasPension && info.bridgeActive" class="split-line">
-        Jahr 1: <strong>{{ formatEUR(info.atRiskMonthlyReal) }}</strong> aus dem Depot
-        <span class="split-sep">·</span>
-        Brücke gleicht den Rentenbeginn (Alter {{ info.pensionStartAge }}) aus – kein Sprung
-      </p>
-      <p v-else-if="info.hasPension" class="split-line">
-        Jahr 1: <strong>{{ formatEUR(info.atRiskMonthlyReal) }}</strong> aus dem Depot
-        <span class="split-sep">·</span>
-        + <strong>{{ formatEUR(info.guaranteedMonthlyReal) }}</strong> Rente ab Alter {{ info.pensionStartAge }}
-      </p>
-
-      <dl class="balance-breakdown">
-        <div class="breakdown-row">
-          <dt>{{ isDynamic ? 'Start-Entnahmerate' : 'Sichere Entnahmerate' }}</dt>
-          <dd>
-            <span class="amount">{{ isDynamic ? info.vpwStartRatePct : info.withdrawalRatePct }} %</span>
-            <span class="delta">{{ isDynamic ? 'des Depots · Jahr 1' : 'des Startkapitals · p.a.' }}</span>
-          </dd>
-        </div>
-
-        <div v-if="monthlyTax > 0" class="breakdown-row">
-          <dt>Brutto-Entnahme <span class="muted">(vor Steuern)</span></dt>
-          <dd>
-            <span class="amount">{{ formatEUR(info.monthlyGrossReal) }}</span>
-            <span class="delta delta-neg">−{{ formatEUR(monthlyTax) }} Steuer</span>
-          </dd>
-        </div>
-
-        <div v-if="info.hasPension" class="breakdown-row">
-          <dt>Gesetzl. Rente <span class="muted">(netto)</span></dt>
-          <dd>
-            <span class="amount">+{{ formatEUR(info.guaranteedMonthlyReal) }}</span>
-            <span class="delta">/Monat real · ab Alter {{ info.pensionStartAge }}</span>
-          </dd>
-        </div>
-
-        <div class="breakdown-row">
-          <dt>Jährlich <span class="muted">heute</span></dt>
-          <dd>
-            <span class="amount">{{ formatEUR(info.annualTotalIncomeReal) }}</span>
-            <span class="delta">pro Jahr</span>
+      <dl class="phase-list">
+        <div v-for="ph in info.phases" :key="ph.label" class="phase-row">
+          <div class="phase-head">
+            <dt class="phase-label">{{ ph.label }}</dt>
+            <span class="phase-age">{{ ph.age }}</span>
+          </div>
+          <dd class="phase-dd">
+            <span class="phase-total">{{ formatEUR(ph.total) }}<span class="per-month"> /Monat</span></span>
+            <span class="phase-split">
+              <template v-if="ph.pension > 0">
+                {{ formatEUR(ph.depot) }} Depot + {{ formatEUR(ph.pension) }} Rente
+                <span class="muted">ab {{ info.pensionStartAge }}</span>
+              </template>
+              <template v-else>nur Depot</template>
+            </span>
           </dd>
         </div>
       </dl>
+
+      <p v-if="shapeNote" class="hero-trend">{{ shapeNote }}</p>
     </div>
   </div>
 
