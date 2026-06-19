@@ -81,8 +81,8 @@ function tooltipRows(d) {
       <span class="legend-item">
         <span class="legend-swatch legend-swatch--line legend-swatch--median"></span>Median
       </span>
-      <span class="legend-item">
-        <span class="legend-swatch legend-swatch--line legend-swatch--p10"></span>schlechter Markt
+      <span class="legend-item" title="10. Perzentil: nur 1 von 10 simulierten Marktverläufen ist schlechter">
+        <span class="legend-swatch legend-swatch--line legend-swatch--p10"></span>schlechter Markt (P10)
       </span>
     </div>
 

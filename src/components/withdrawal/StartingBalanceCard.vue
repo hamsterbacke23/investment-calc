@@ -1,5 +1,5 @@
 <script setup>
-import { finalBalance } from '../../composables/useGrowthCalculations.js';
+import { finalBalance, finalBalanceReal } from '../../composables/useGrowthCalculations.js';
 import { formatEUR } from '../../utils/tax.js';
 </script>
 
@@ -8,7 +8,8 @@ import { formatEUR } from '../../utils/tax.js';
     <h3>Startguthaben</h3>
     <div class="balance-display">
       <h2 class="balance-value">{{ formatEUR(finalBalance) }}</h2>
-      <span class="balance-note">aus der Ansparphase</span>
+      <span class="balance-note">aus der Ansparphase · nominal bei Entnahmestart</span>
+      <span class="balance-real">≈ {{ formatEUR(finalBalanceReal) }} in heutiger Kaufkraft</span>
     </div>
   </section>
 </template>

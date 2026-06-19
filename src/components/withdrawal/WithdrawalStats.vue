@@ -49,7 +49,7 @@ const reach = computed(() => {
 // One short note describing what happens to the remaining capital.
 const capitalNote = computed(() => {
   const t = info.value;
-  if (t.isDynamic) return 'dynamisch aufgezehrt (VPW) – Median am Ende';
+  if (t.isDynamic) return 'Ziel erreicht: planmäßig aufgezehrt, statt reich zu sterben';
   if (t.depletedEarly) return 'in ungünstigen Märkten vorzeitig erschöpft';
   if (allowCapitalDecay.value) return 'Verzehr erlaubt – Puffer bleibt im Normalfall';
   return t.mode === 'real' ? 'real erhalten' : 'nominal erhalten';
@@ -60,14 +60,14 @@ const capitalNote = computed(() => {
   <div class="stats-grid stats-grid--split">
     <div class="stat-card capital-card safety-card">
       <template v-if="isDynamic">
-        <label>Dynamische Entnahme · VPW</label>
+        <label title="VPW: Du entnimmst jedes Jahr einen neu berechneten Anteil des AKTUELLEN Depots. Der Anteil steigt mit dem Alter und zehrt das Kapital planmäßig bis zum Endalter auf.">Dynamische Entnahme · VPW</label>
         <p class="safety-pct success--neutral">{{ info.vpwStartRatePct }} %</p>
         <p class="safety-caption">
           Start-Entnahmerate · jährlich neu auf den aktuellen Depotstand gerechnet
         </p>
       </template>
       <template v-else>
-        <label>Plan-Sicherheit</label>
+        <label title="Anteil der 1.000 simulierten Marktverläufe, in denen die feste Entnahme die ganze Laufzeit durchhält.">Plan-Sicherheit</label>
         <p class="safety-pct" :class="`success--${successTone}`">{{ info.successRate }} %</p>
         <p class="safety-caption">
           aus 1.000 simulierten Marktverläufen · Ziel {{ info.targetSuccess }} %
@@ -83,7 +83,7 @@ const capitalNote = computed(() => {
       <dl class="plan-facts">
         <div class="plan-fact">
           <div class="plan-fact-row">
-            <dt>Reichweite</dt>
+            <dt title="Bis zu diesem Alter trägt das Depot die Entnahme. Das ist deine Langlebigkeits-Annahme (Entnahmedauer) – eher konservativ wählen; danach bleibt die Rente.">Reichweite</dt>
             <dd>{{ reach.headline }}</dd>
           </div>
           <p v-if="reach.sub" class="fact-sub">{{ reach.sub }}</p>
@@ -91,8 +91,8 @@ const capitalNote = computed(() => {
 
         <div class="plan-fact">
           <div class="plan-fact-row">
-            <dt>Median-Restkapital</dt>
-            <dd>{{ formatEUR(info.endBalance) }}</dd>
+            <dt title="Median-Depotwert am Ende der Laufzeit. Bei dynamischer Entnahme ~0 € – genau das Ziel: das Kapital nutzen statt reich zu sterben.">Median-Restkapital</dt>
+            <dd :class="{ 'goal-hit': info.isDynamic }">{{ formatEUR(info.endBalance) }}</dd>
           </div>
           <p class="fact-sub">{{ capitalNote }}</p>
         </div>
@@ -119,10 +119,18 @@ const capitalNote = computed(() => {
         Jahr 1 → Jahr {{ info.lastYear }} · bei {{ inflationRate.toFixed(1) }}% Inflation<template v-if="info.mode === 'real'"> · Entnahme wächst mit der Inflation</template><template v-else-if="info.mode === 'dynamic'"> · Median; Entnahme folgt dem Depot (VPW)</template>
       </span>
 
+      <p
+        v-if="isDynamic && info.monthlyRealEnd < info.monthlyRealStart"
+        class="drag-note"
+        title="Der Median-Verlauf liegt unter dem Mittelwert, weil Schwankung die typische (geometrische) Rendite drückt – und weil die Kalkulations-Rendite g über der Marktrendite liegt. Ein niedrigeres g glättet den Verlauf."
+      >
+        Der Median sinkt mit der Zeit – das ist normal (Volatility Drag + g über Marktrendite), kein Fehler. Niedrigeres g = gleichmäßiger.
+      </p>
+
       <p v-if="info.hasPension" class="split-line">
-        davon <strong>{{ formatEUR(info.guaranteedMonthlyReal) }}</strong> garantiert (Rente)
+        Jahr 1: <strong>{{ formatEUR(info.atRiskMonthlyReal) }}</strong> aus dem Depot
         <span class="split-sep">·</span>
-        <strong>{{ formatEUR(info.atRiskMonthlyReal) }}</strong> aus dem Depot
+        + <strong>{{ formatEUR(info.guaranteedMonthlyReal) }}</strong> Rente ab Alter {{ info.pensionStartAge }}
       </p>
 
       <dl class="balance-breakdown">

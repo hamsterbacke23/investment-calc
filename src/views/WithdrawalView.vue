@@ -68,7 +68,7 @@ const ageLabel = (d) => String(d.age);
         v-if="chartMode === 'income' && isDynamic"
         :data="withdrawalIncomeBands"
         :x-label-fn="ageLabel"
-        caption="Alter · monatliches Nettoeinkommen (heutige Kaufkraft) — Median und Spanne aus 1.000 Marktszenarien"
+        caption="Alter · monatliches Nettoeinkommen (heutige Kaufkraft, inkl. Rente ab Renteneintritt) — Median + Spanne aus 1.000 Marktszenarien; gestrichelt = P10 (1 von 10 schlechter)"
       />
       <BarChart
         v-else-if="chartMode === 'income'"
@@ -86,7 +86,7 @@ const ageLabel = (d) => String(d.age);
         v-else
         :data="withdrawalFanBands"
         :x-label-fn="ageLabel"
-        caption="Alter · Depotwert (nominal) — Median und 10–90 %-Bandbreite aus 1.000 Marktszenarien"
+        caption="Alter · Depotwert (nominal) — Median + 10–90 %-Band aus 1.000 Marktszenarien; gestrichelt = P10 (1 von 10 schlechter)"
       />
 
       <WithdrawalStats />

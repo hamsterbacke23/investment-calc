@@ -1219,6 +1219,14 @@ input[type="range"]::-moz-range-thumb {
   letter-spacing: 0.05em;
 }
 
+.balance-real {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.74rem;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
 .setting-group { margin-bottom: 1.25rem; }
 
 .setting-label {
@@ -1550,6 +1558,24 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid hsl(var(--destructive) / 0.25);
   border-radius: 8px;
 }
+
+/* Explains the falling VPW median (volatility drag) — not an error. */
+.drag-note {
+  margin: 0.1rem 0 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+  cursor: help;
+}
+
+/* Spending the depot down to ~0 is the goal in dynamic mode, not a warning. */
+.goal-hit { color: hsl(var(--positive)); }
+
+/* Affordance for the explanatory tooltips on metric labels. */
+.plan-fact dt[title],
+.safety-card label[title],
+.balance-breakdown dt[title] { cursor: help; }
 
 .plan-facts {
   margin: 1.15rem 0 0;
