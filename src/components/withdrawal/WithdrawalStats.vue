@@ -193,9 +193,4 @@ const shapeNote = computed(() => {
       <p v-if="shapeNote" class="hero-trend">{{ shapeNote }}</p>
     </div>
   </div>
-
-  <RouterLink to="/growth" class="back-link">
-    <span class="back-arrow" aria-hidden="true">←</span>
-    Zurück zur Ansparphase
-  </RouterLink>
 </template>

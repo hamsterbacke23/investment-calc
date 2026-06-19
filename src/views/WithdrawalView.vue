@@ -92,6 +92,11 @@ const ageLabel = (d) => String(d.age);
 
       <WithdrawalStats />
       <ModeComparison />
+
+      <RouterLink to="/growth" class="back-link">
+        <span class="back-arrow" aria-hidden="true">←</span>
+        Zurück zur Ansparphase
+      </RouterLink>
     </div>
   </main>
 </template>
