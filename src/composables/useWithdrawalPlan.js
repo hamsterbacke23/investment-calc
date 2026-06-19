@@ -11,6 +11,7 @@ import {
   withdrawalVolatility,
   targetSuccessRate,
   etfCostRate,
+  vpwReturn,
   durationYears,
   inflationRate,
 } from './useInvestmentStore.js';
@@ -36,15 +37,27 @@ const NO_COLLECT = {};
 
 const currentYear = new Date().getFullYear();
 
+// VPW amortisation rate for `remaining` years at assumed (real) return g.
+// rate = g / (1 − (1+g)^−N); → 1/N for g=0; capped at 1 (last year takes all).
+export function vpwRate(g, remaining) {
+  const N = Math.max(1, remaining);
+  if (N <= 1) return 1;
+  const r = g === 0 ? 1 / N : g / (1 - Math.pow(1 + g, -N));
+  return Math.min(1, r);
+}
+
 // --- One simulated path ----------------------------------------------------
 // shockRow = null → der deterministische MEDIAN-Pfad (Wachstumsfaktor exp(driftLog),
-// keine Volatilität); sonst ein lognormaler Marktverlauf. Der Median (nicht der
-// arithmetische Mittelwert) wird genutzt, damit der Depotverlauf der Einkommens-
-// Balken zur p50-Linie des Fan-Charts passt. Steuerlogik ist in beiden Fällen
-// identisch. opts.balances füllt die Jahresend-Depotwerte, opts.detailed sammelt
-// die vollständige Aufschlüsselung für das Einkommens-Chart.
+// keine Volatilität); sonst ein lognormaler Marktverlauf. Entnahme-Modi:
+//   'nominal'/'real' → die gelöste feste Entnahme (monthlyW1), ggf. inflationsindexiert.
+//   'dynamic' (VPW)  → jedes Jahr vpwRate(g, Restjahre) des AKTUELLEN Depots; der Betrag
+//                      folgt also dem echten Depotstand (monthlyW1 wird ignoriert).
+// Die VPW-Rate ist einheitenlos: angewandt aufs nominale Depot ergibt sie eine Entnahme,
+// deren realer Wert dem realen g folgt (keine doppelte Inflation). Steuerlogik identisch.
+// opts.balances füllt die Jahresend-Depotwerte, opts.income die Netto-Entnahme je Jahr,
+// opts.detailed sammelt die volle Aufschlüsselung fürs Einkommens-Chart.
 function simulate(monthlyW1, ctx, shockRow, opts) {
-  const { depot0, basis0, n, i, mode, sigmaLog, driftLog } = ctx;
+  const { depot0, basis0, n, i, mode, g, sigmaLog, driftLog } = ctx;
   let depot = depot0;
   let basis = basis0;
   let depletionYear = 0;
@@ -59,7 +72,10 @@ function simulate(monthlyW1, ctx, shockRow, opts) {
     const grown = depot * growthFactor;
     const valueGain = grown - depotStart;
 
-    const wPlanned = baseAnnual * (mode === 'real' ? Math.pow(1 + i, Y - 1) : 1);
+    const wPlanned =
+      mode === 'dynamic'
+        ? grown * vpwRate(g, n - Y + 1)
+        : baseAnnual * (mode === 'real' ? Math.pow(1 + i, Y - 1) : 1);
     const wActual = Math.min(wPlanned, Math.max(0, grown));
 
     // Proportionale Durchschnittsmethode: nur der Gewinnanteil der Entnahme ist
@@ -96,6 +112,7 @@ function simulate(monthlyW1, ctx, shockRow, opts) {
     if (!depletionYear && wActual < wPlanned - 0.5) depletionYear = Y;
 
     if (opts.balances) opts.balances[Y - 1] = depot;
+    if (opts.income) opts.income[Y - 1] = netWithdrawal;
     if (rows) {
       rows.push({
         year: Y,
@@ -185,6 +202,7 @@ export function computeWithdrawalPlan() {
   const empty = {
     rows: [],
     fanBands: [],
+    incomeBands: [],
     summary: emptySummary(),
   };
   if (depot0 <= 0) return empty;
@@ -192,40 +210,73 @@ export function computeWithdrawalPlan() {
   const basis0 = Math.min(totalInvested.value, depot0);
   const n = Math.max(1, withdrawalPlanYears.value);
   const i = inflationRate.value / 100;
-  const mode = withdrawalMode.value === 'real' ? 'real' : 'nominal';
+  const mode =
+    withdrawalMode.value === 'real'
+      ? 'real'
+      : withdrawalMode.value === 'dynamic'
+        ? 'dynamic'
+        : 'nominal';
+  const isDynamic = mode === 'dynamic';
   const decay = !!allowCapitalDecay.value;
 
   const muNet = (withdrawalReturnRate.value - etfCostRate.value) / 100;
   const sigmaLog = Math.max(0, withdrawalVolatility.value / 100);
   // Lognormal drift chosen so the arithmetic mean growth equals 1 + muNet.
   const driftLog = Math.log(1 + Math.max(-0.99, muNet)) - 0.5 * sigmaLog * sigmaLog;
+  // VPW amortisation return (real) — a SEPARATE assumption that only sizes the
+  // withdrawal; the actual returns come from the Monte-Carlo distribution above.
+  const g = vpwReturn.value / 100;
 
-  const targetEnd = decay ? 0 : mode === 'real' ? depot0 * Math.pow(1 + i, n) : depot0;
+  // Dynamic (VPW) spends down to ~0 by construction → target is just "lasts" (≥0).
+  const targetEnd =
+    decay || isDynamic ? 0 : mode === 'real' ? depot0 * Math.pow(1 + i, n) : depot0;
   const targetSuccess = targetSuccessRate.value / 100;
 
-  const ctx = { depot0, basis0, n, i, mode, muNet, sigmaLog, driftLog, targetEnd, targetSuccess };
+  const ctx = { depot0, basis0, n, i, mode, g, muNet, sigmaLog, driftLog, targetEnd, targetSuccess };
   const shocks = normalShockMatrix(PATHS, n);
 
-  const monthlyW1 = solveMonthlyW1(ctx, shocks);
+  // Fixed-withdrawal modes solve for the sustainable amount; VPW derives it yearly.
+  const monthlyW1 = isDynamic ? 0 : solveMonthlyW1(ctx, shocks);
 
-  // Infeasibility check: if even a zero withdrawal can't reach the success target
-  // (typical for real capital-preservation under high volatility), the solver
-  // collapses to ~0. Flag it so the UI says "Ziel nicht erreichbar" instead of
-  // presenting a 0 €/Monat plan as if it were the answer.
-  let zeroOk = 0;
-  for (let p = 0; p < PATHS; p++) {
-    if (isSuccess(simulate(0, ctx, shocks[p], NO_COLLECT), targetEnd)) zeroOk++;
+  // Infeasibility only applies to the fixed modes: if even a zero withdrawal can't
+  // reach the success target (real capital-preservation under high volatility),
+  // the solver collapses to ~0 — flag it instead of showing a 0 €/Monat plan.
+  let infeasible = false;
+  if (!isDynamic) {
+    let zeroOk = 0;
+    for (let p = 0; p < PATHS; p++) {
+      if (isSuccess(simulate(0, ctx, shocks[p], NO_COLLECT), targetEnd)) zeroOk++;
+    }
+    infeasible = zeroOk / PATHS < targetSuccess - 0.005;
   }
-  const infeasible = zeroOk / PATHS < targetSuccess - 0.005;
 
-  // --- Fan pass: distribution of depot balance + plan reach across all paths ---
+  // Net pension per plan year (deterministic, layered on top — never part of the
+  // amortised depot), plus the real deflator for that year.
+  const yearsUntilPension = Math.max(0, pensionStartAge.value - withdrawalStartAge.value);
+  const pmToday = Math.max(0, pensionMonthly.value);
+  const pNet = pensionNetFactor();
+  const realFactorOf = (Y) => Math.pow(1 + i, durationYears.value + (Y - 1));
+  const pensionNetNominalOf = (Y) =>
+    pmToday > 0 && Y > yearsUntilPension ? pmToday * realFactorOf(Y) * 12 * pNet.factor : 0;
+
+  // --- Fan pass: depot balance + (for VPW) net real income across all paths ---
   const balancesByYear = Array.from({ length: n }, () => new Float64Array(PATHS));
+  const incomeByYear = isDynamic
+    ? Array.from({ length: n }, () => new Float64Array(PATHS))
+    : null;
   const reach = new Int16Array(PATHS); // plan year the depot ran dry, or n+1 if it lasted
   const tmpBal = new Float64Array(n);
+  const tmpInc = new Float64Array(n);
   let successCount = 0;
   for (let p = 0; p < PATHS; p++) {
-    const res = simulate(monthlyW1, ctx, shocks[p], { balances: tmpBal });
-    for (let y = 0; y < n; y++) balancesByYear[y][p] = tmpBal[y];
+    const res = simulate(monthlyW1, ctx, shocks[p], { balances: tmpBal, income: tmpInc });
+    for (let y = 0; y < n; y++) {
+      balancesByYear[y][p] = tmpBal[y];
+      if (incomeByYear) {
+        // total net real income = depot net withdrawal + net pension, deflated.
+        incomeByYear[y][p] = (tmpInc[y] + pensionNetNominalOf(y + 1)) / realFactorOf(y + 1);
+      }
+    }
     reach[p] = res.depletionYear === 0 ? n + 1 : res.depletionYear;
     if (isSuccess(res, targetEnd)) successCount++;
   }
@@ -237,9 +288,28 @@ export function computeWithdrawalPlan() {
       year: y + 1,
       age: withdrawalStartAge.value + y,
       p10: Math.round(percentile(sorted, 10)),
+      p25: Math.round(percentile(sorted, 25)),
       p50: Math.round(percentile(sorted, 50)),
+      p75: Math.round(percentile(sorted, 75)),
       p90: Math.round(percentile(sorted, 90)),
     });
+  }
+
+  // Income bandwidth (VPW only): P10/P25/P50/P75/P90 of net real income per age.
+  const incomeBands = [];
+  if (incomeByYear) {
+    for (let y = 0; y < n; y++) {
+      const sorted = incomeByYear[y].slice().sort();
+      incomeBands.push({
+        year: y + 1,
+        age: withdrawalStartAge.value + y,
+        p10: Math.round(percentile(sorted, 10) / 12),
+        p25: Math.round(percentile(sorted, 25) / 12),
+        p50: Math.round(percentile(sorted, 50) / 12),
+        p75: Math.round(percentile(sorted, 75) / 12),
+        p90: Math.round(percentile(sorted, 90) / 12),
+      });
+    }
   }
 
   const reachSorted = reach.slice().sort();
@@ -248,13 +318,8 @@ export function computeWithdrawalPlan() {
   const successRate = (successCount / PATHS) * 100;
   const medianEndBalance = fanBands.length ? fanBands[n - 1].p50 : 0;
 
-  // --- Expected income path (deterministic) drives the income bars ---
+  // --- Representative (median-path) income breakdown drives the income bars ---
   const { rows: rawRows } = simulate(monthlyW1, ctx, null, { detailed: true });
-
-  // Layer the net pension on top, in nominal terms, growing with inflation.
-  const yearsUntilPension = Math.max(0, pensionStartAge.value - withdrawalStartAge.value);
-  const pmToday = Math.max(0, pensionMonthly.value);
-  const pNet = pensionNetFactor();
 
   const rows = rawRows.map((r) => {
     const absoluteYearOffset = durationYears.value + (r.year - 1);
@@ -274,7 +339,9 @@ export function computeWithdrawalPlan() {
       returns: Math.round(r.returns),
       realizedGain: Math.round(r.realizedGain),
       tax: Math.round(r.tax),
+      taxReal: Math.round(r.tax / realFactor),
       net: Math.round(r.net),
+      withdrawalReal: Math.round(r.withdrawal / realFactor),
       pension: Math.round(pensionNetNominal),
       pensionGross: Math.round(pensionGrossNominal),
       pensionMonthly: Math.round(pensionNetNominal / 12),
@@ -291,6 +358,7 @@ export function computeWithdrawalPlan() {
     rows,
     n,
     mode,
+    isDynamic,
     decay,
     depot0,
     monthlyW1,
@@ -299,13 +367,15 @@ export function computeWithdrawalPlan() {
     p10ReachYear,
     medianEndBalance,
     fanBands,
+    incomeBands,
+    vpwStartRate: isDynamic ? vpwRate(g, n) : 0,
     pNet,
     pmToday,
     yearsUntilPension,
     infeasible,
   });
 
-  return { rows, fanBands, summary };
+  return { rows, fanBands, incomeBands, summary };
 }
 
 function emptySummary() {
@@ -315,6 +385,7 @@ function emptySummary() {
     annualTotalIncome: 0, annualTotalIncomeEnd: 0,
     monthlyTotalIncome: 0, monthlyTotalIncomeEnd: 0,
     monthlyRealStart: 0, monthlyRealEnd: 0,
+    monthlyGrossReal: 0, monthlyTaxReal: 0, annualTotalIncomeReal: 0,
     lastYear: 0, totalTax: 0, totalRealizedGain: 0, effectiveRate: '0.0',
     endBalance: finalBalance.value,
     depletionYear: null, depletedEarly: false,
@@ -327,13 +398,19 @@ function emptySummary() {
     guaranteedMonthlyReal: 0, atRiskMonthlyReal: 0,
     pensionKvpvRate: 0, pensionTaxRate: 0,
     infeasible: false,
+    isDynamic: withdrawalMode.value === 'dynamic',
+    vpwStartRatePct: '0.0',
+    dynIncomeMedianStart: 0, dynIncomeP10Start: 0, dynIncomeP90Start: 0, dynIncomeMedianEnd: 0,
   };
 }
 
 function buildSummary(d) {
-  const { rows, n, mode, decay, depot0, monthlyW1, pNet, pmToday, yearsUntilPension } = d;
+  const { rows, n, mode, isDynamic, depot0, monthlyW1, pNet, pmToday, yearsUntilPension } = d;
   const first = rows[0];
   const last = rows[rows.length - 1];
+  const ib = d.incomeBands || [];
+  const ib0 = ib[0] || { p10: 0, p50: 0, p90: 0 };
+  const ibLast = ib[ib.length - 1] || ib0;
   const totalTax = rows.reduce((acc, r) => acc + r.tax, 0);
   const totalRealizedGain = rows.reduce((acc, r) => acc + r.realizedGain, 0);
 
@@ -358,8 +435,13 @@ function buildSummary(d) {
     annualTotalIncomeEnd: last.totalNet,
     monthlyTotalIncome: Math.round(first.totalNet / 12),
     monthlyTotalIncomeEnd: Math.round(last.totalNet / 12),
-    monthlyRealStart: Math.round(first.totalNetReal / 12),
-    monthlyRealEnd: Math.round(last.totalNetReal / 12),
+    // For VPW the income varies by path → the hero shows the median (p50) income.
+    monthlyRealStart: isDynamic ? ib0.p50 : Math.round(first.totalNetReal / 12),
+    monthlyRealEnd: isDynamic ? ibLast.p50 : Math.round(last.totalNetReal / 12),
+    // Real (today's purchasing power) versions, so the hero card is consistent.
+    monthlyGrossReal: Math.round(first.withdrawalReal / 12),
+    monthlyTaxReal: Math.round(first.taxReal / 12),
+    annualTotalIncomeReal: first.totalNetReal,
     lastYear: last.year,
     totalTax: Math.round(totalTax),
     totalRealizedGain: Math.round(totalRealizedGain),
@@ -387,6 +469,13 @@ function buildSummary(d) {
     pensionKvpvRate: pNet.kvpvRate || 0,
     pensionTaxRate: pNet.taxRate || 0,
     infeasible: !!d.infeasible,
+    // --- dynamic (VPW) income bandwidth (real, net, per month) ---
+    isDynamic: !!isDynamic,
+    vpwStartRatePct: d.vpwStartRate ? (d.vpwStartRate * 100).toFixed(1) : '0.0',
+    dynIncomeMedianStart: ib0.p50,
+    dynIncomeP10Start: ib0.p10,
+    dynIncomeP90Start: ib0.p90,
+    dynIncomeMedianEnd: ibLast.p50,
   };
 }
 
@@ -420,6 +509,7 @@ watch(
 export const calculateWithdrawalData = computed(() => planRef.value.rows);
 export const withdrawalTaxInfo = computed(() => planRef.value.summary);
 export const withdrawalFanBands = computed(() => planRef.value.fanBands);
+export const withdrawalIncomeBands = computed(() => planRef.value.incomeBands || []);
 
 // The withdrawal chart visualises INCOME, not the depot balance: each bar is the
 // total net income of that year (net depot withdrawal + net pension).

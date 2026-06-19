@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { computeWithdrawalPlan } from './useWithdrawalPlan.js';
+import { computeWithdrawalPlan, vpwRate } from './useWithdrawalPlan.js';
 import {
   initialCapital,
   durationYears,
@@ -14,6 +14,7 @@ import {
   withdrawalVolatility,
   targetSuccessRate,
   etfCostRate,
+  vpwReturn,
   pensionMonthly,
   pensionStartAge,
   withdrawalStartAge,
@@ -33,6 +34,7 @@ function baseScenario() {
   etfCostRate.value = 0.2;
   withdrawalVolatility.value = 15;
   targetSuccessRate.value = 90;
+  vpwReturn.value = 4;
   allowCapitalDecay.value = true;
   withdrawalMode.value = 'nominal';
   pensionMonthly.value = 0;
@@ -42,6 +44,20 @@ function baseScenario() {
 }
 
 beforeEach(baseScenario);
+
+describe('VPW amortisation rate', () => {
+  it('matches the formula and the g=4,4 % / N=30 control (~6,1 %)', () => {
+    expect(vpwRate(0.044, 30)).toBeCloseTo(0.0607, 3);
+    expect(vpwRate(0, 25)).toBeCloseTo(1 / 25, 6); // g=0 → 1/N annuity
+  });
+
+  it('rises as the horizon shrinks and caps at 100 % in the final year', () => {
+    expect(vpwRate(0.04, 30)).toBeLessThan(vpwRate(0.04, 10));
+    expect(vpwRate(0.04, 10)).toBeLessThan(vpwRate(0.04, 2));
+    expect(vpwRate(0.04, 1)).toBe(1);
+    expect(vpwRate(0.04, 0)).toBe(1);
+  });
+});
 
 describe('Monte-Carlo withdrawal engine', () => {
   it('solves a feasible plan close to the target success rate', () => {
@@ -98,6 +114,33 @@ describe('Monte-Carlo withdrawal engine', () => {
     expect(summary.guaranteedMonthlyReal).toBeLessThan(1500);
     // ~12,35 % KV/PV + a little tax ⇒ factor in a sensible band.
     expect(summary.guaranteedMonthlyReal).toBeGreaterThan(1500 * 0.8);
+  });
+
+  it('dynamic (VPW) draws the depot down to ~0 and yields an income band', () => {
+    withdrawalMode.value = 'real';
+    const real = computeWithdrawalPlan();
+
+    withdrawalMode.value = 'dynamic';
+    const dyn = computeWithdrawalPlan();
+
+    expect(dyn.summary.isDynamic).toBe(true);
+    // Income varies by market path → a real P10..P90 band with genuine spread.
+    expect(dyn.incomeBands.length).toBe(30);
+    expect(dyn.incomeBands[10].p90).toBeGreaterThan(dyn.incomeBands[10].p10);
+    // VPW spends the depot down to ~0 by the horizon — far below constant-real.
+    expect(dyn.summary.endBalance).toBeLessThan(real.summary.endBalance);
+    expect(dyn.summary.endBalance).toBeLessThan(500000 * 0.05);
+    // Start rate ≈ the VPW formula for g=4 %, N=30 (~5,7 %).
+    expect(parseFloat(dyn.summary.vpwStartRatePct)).toBeCloseTo(vpwRate(0.04, 30) * 100, 1);
+  });
+
+  it('the VPW return g sizes the withdrawal independently of the market mean', () => {
+    withdrawalMode.value = 'dynamic';
+    vpwReturn.value = 2;
+    const low = computeWithdrawalPlan().summary.dynIncomeMedianStart;
+    vpwReturn.value = 6;
+    const high = computeWithdrawalPlan().summary.dynIncomeMedianStart;
+    expect(high).toBeGreaterThan(low); // higher g → larger initial withdrawal
   });
 
   it('returns an empty plan when there is no capital', () => {

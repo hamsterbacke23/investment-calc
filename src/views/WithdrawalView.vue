@@ -11,12 +11,15 @@ import {
   withdrawalRealLine,
   maxWithdrawalIncome,
   withdrawalFanBands,
+  withdrawalIncomeBands,
   withdrawalTaxInfo,
 } from '../composables/useWithdrawalPlan.js';
 import { sidebarInert } from '../composables/useSettingsPanel.js';
 
-// 'income' = net income bars (the plan); 'wealth' = Monte-Carlo depot cone.
+// 'income' = net income (the plan); 'wealth' = Monte-Carlo depot cone.
 const chartMode = ref('income');
+// VPW income varies by path → the income view becomes a band chart too.
+const isDynamic = computed(() => withdrawalTaxInfo.value.isDynamic);
 
 const legend = computed(() => {
   const items = [{ label: 'Entnahme (netto)', color: 'var(--bar-deposit)' }];
@@ -60,8 +63,15 @@ const ageLabel = (d) => String(d.age);
         </div>
       </div>
 
+      <!-- Income view: fixed modes → net-income bars; VPW → income band (P10/P50/P90). -->
+      <FanChart
+        v-if="chartMode === 'income' && isDynamic"
+        :data="withdrawalIncomeBands"
+        :x-label-fn="ageLabel"
+        caption="Alter · monatliches Nettoeinkommen (heutige Kaufkraft) — Median und Spanne aus 1.000 Marktszenarien"
+      />
       <BarChart
-        v-if="chartMode === 'income'"
+        v-else-if="chartMode === 'income'"
         :data="calculateWithdrawalData"
         :bar-style-fn="withdrawalBarStyle"
         variant="withdrawal"

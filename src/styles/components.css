@@ -367,7 +367,9 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .legend-swatch--median { border-top-color: hsl(var(--primary)); }
-.legend-swatch--band { background: hsl(var(--primary) / 0.22); }
+.legend-swatch--band { background: hsl(var(--primary) / 0.16); }
+.legend-swatch--band-inner { background: hsl(var(--primary) / 0.3); }
+.legend-swatch--p10 { border-top: 2px dashed hsl(var(--destructive) / 0.7); }
 
 /* --- Chart mode toggle (Einkommen ↔ Vermögen) --- */
 .chart-toggle {
@@ -397,9 +399,22 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .fan-band {
-  fill: hsl(var(--primary) / 0.16);
+  fill: hsl(var(--primary) / 0.12);
   stroke: none;
   animation: fadeIn 0.6s ease both;
+}
+
+/* Inner 25–75 % band draws on top → darker core showing the likely range. */
+.fan-band--inner { fill: hsl(var(--primary) / 0.18); }
+
+/* "Schlechter Markt" 10th-percentile guide line. */
+.fan-p10 {
+  fill: none;
+  stroke: hsl(var(--destructive) / 0.6);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  stroke-linecap: round;
+  animation: fadeIn 0.7s ease 0.3s both;
 }
 
 .fan-median {
@@ -1273,6 +1288,9 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid hsl(var(--border));
   border-radius: 8px;
 }
+
+.segmented--3 { grid-template-columns: 1fr 1fr 1fr; }
+.segmented--3 .segmented-btn { padding: 0.45rem 0.3rem; }
 
 .segmented-btn {
   border: none;

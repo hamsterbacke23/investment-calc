@@ -44,8 +44,9 @@ export const transactions = ref([
 export const withdrawalPlanYears = ref(30);
 export const allowCapitalDecay = ref(true);
 export const withdrawalReturnRate = ref(6);
-// Withdrawal payout shape: 'nominal' (fixed €) | 'real' (kaufkraftbereinigt, wächst mit Inflation)
-export const withdrawalMode = ref('nominal');
+// Withdrawal strategy: 'dynamic' (VPW — amortise the current depot each year, the
+// default) | 'real' (inflation-indexed fixed €) | 'nominal' (fixed €).
+export const withdrawalMode = ref('dynamic');
 
 // --- Pension (Gesetzliche Rente) ---
 // pensionMonthly is given in today's purchasing power (€/Monat, brutto).
@@ -63,6 +64,9 @@ export const withdrawalVolatility = ref(15);
 export const targetSuccessRate = ref(90);
 // All-in annual product cost (TER + spreads), subtracted from the gross return.
 export const etfCostRate = ref(0.2);
+// VPW amortisation return (g, real %) — used ONLY to size the dynamic withdrawal,
+// deliberately separate from the Monte-Carlo market return above.
+export const vpwReturn = ref(4);
 
 // --- URL state sharing ---
 export function encodeState() {
@@ -82,6 +86,7 @@ export function encodeState() {
     vol: withdrawalVolatility.value,
     tsr: targetSuccessRate.value,
     cost: etfCostRate.value,
+    vpw: vpwReturn.value,
     rsc: returnScenario.value,
     yp: yieldPhases.value.map(p => ({ s: p.startYear, e: p.endYear, lo: p.rateMin, hi: p.rateMax, cd: p.customDuration ? 1 : 0 })),
     tr: transactions.value.map(tx => ({ n: tx.name, a: tx.amount, tp: tx.type === 'monthly' ? 'm' : 'o', s: tx.startYear, e: tx.endYear, cd: tx.customDuration ? 1 : 0 })),
@@ -97,7 +102,7 @@ function applyState(data) {
   if (data.wpy !== undefined) withdrawalPlanYears.value = Math.min(80, Math.max(1, Number(data.wpy)));
   if (data.acd !== undefined) allowCapitalDecay.value = !!data.acd;
   if (data.wrr !== undefined) withdrawalReturnRate.value = Math.min(20, Math.max(0, Number(data.wrr)));
-  if (data.wm === 'real' || data.wm === 'nominal') withdrawalMode.value = data.wm;
+  if (data.wm === 'real' || data.wm === 'nominal' || data.wm === 'dynamic') withdrawalMode.value = data.wm;
   if (data.pm !== undefined) pensionMonthly.value = Math.max(0, Number(data.pm) || 0);
   if (data.psa !== undefined) pensionStartAge.value = Math.min(80, Math.max(50, Number(data.psa) || 67));
   if (data.wsa !== undefined) withdrawalStartAge.value = Math.min(90, Math.max(30, Number(data.wsa) || 60));
@@ -105,6 +110,7 @@ function applyState(data) {
   if (data.vol !== undefined) withdrawalVolatility.value = Math.min(40, Math.max(0, Number(data.vol)));
   if (data.tsr !== undefined) targetSuccessRate.value = Math.min(99, Math.max(50, Number(data.tsr)));
   if (data.cost !== undefined) etfCostRate.value = Math.min(3, Math.max(0, Number(data.cost)));
+  if (data.vpw !== undefined) vpwReturn.value = Math.min(15, Math.max(0, Number(data.vpw)));
   if (data.rsc === 'worst' || data.rsc === 'best' || data.rsc === 'avg') returnScenario.value = data.rsc;
   if (data.yp) {
     // Coerce + clamp like the scalar fields above, so a hand-edited/garbage
@@ -169,6 +175,7 @@ function saveToLocal() {
     withdrawalVolatility: withdrawalVolatility.value,
     targetSuccessRate: targetSuccessRate.value,
     etfCostRate: etfCostRate.value,
+    vpwReturn: vpwReturn.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -194,7 +201,7 @@ export function loadFromLocal() {
       const rate = Number(parsed.withdrawalReturnRate);
       withdrawalReturnRate.value = Number.isFinite(rate) ? Math.min(20, Math.max(0, rate)) : 6;
     }
-    if (parsed.withdrawalMode === 'real' || parsed.withdrawalMode === 'nominal') {
+    if (['real', 'nominal', 'dynamic'].includes(parsed.withdrawalMode)) {
       withdrawalMode.value = parsed.withdrawalMode;
     }
     if (parsed.pensionMonthly !== undefined) {
@@ -221,6 +228,10 @@ export function loadFromLocal() {
     if (parsed.etfCostRate !== undefined) {
       const v = Number(parsed.etfCostRate);
       etfCostRate.value = Number.isFinite(v) ? Math.min(3, Math.max(0, v)) : 0.2;
+    }
+    if (parsed.vpwReturn !== undefined) {
+      const v = Number(parsed.vpwReturn);
+      vpwReturn.value = Number.isFinite(v) ? Math.min(15, Math.max(0, v)) : 4;
     }
     if (parsed.returnScenario === 'worst' || parsed.returnScenario === 'best' || parsed.returnScenario === 'avg') {
       returnScenario.value = parsed.returnScenario;
@@ -296,6 +307,7 @@ export function initInvestmentStore() {
       withdrawalVolatility,
       targetSuccessRate,
       etfCostRate,
+      vpwReturn,
     ],
     () => saveToLocal(),
     { deep: true },

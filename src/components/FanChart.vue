@@ -37,17 +37,21 @@ const xLabel = (d) => (props.xLabelFn ? props.xLabelFn(d) : String(d.year));
 const px = (i) => (count.value <= 1 ? 50 : (i / (count.value - 1)) * 100);
 const py = (v) => 100 - Math.max(0, Math.min(100, (v / maxScale.value) * 100));
 
-// Polygon: along p90 left→right, then back along p10 right→left.
-const bandPoints = computed(() => {
+// Polygon between two percentile series: hi left→right, then lo right→left.
+function bandBetween(loKey, hiKey) {
   if (!props.data.length) return '';
-  const top = props.data.map((d, i) => `${px(i).toFixed(2)},${py(d.p90).toFixed(2)}`);
-  const bottom = props.data.map((d, i) => `${px(i).toFixed(2)},${py(d.p10).toFixed(2)}`).reverse();
+  const top = props.data.map((d, i) => `${px(i).toFixed(2)},${py(d[hiKey]).toFixed(2)}`);
+  const bottom = props.data.map((d, i) => `${px(i).toFixed(2)},${py(d[loKey]).toFixed(2)}`).reverse();
   return [...top, ...bottom].join(' ');
-});
+}
 
-const medianPoints = computed(() =>
-  props.data.map((d, i) => `${px(i).toFixed(2)},${py(d.p50).toFixed(2)}`).join(' '),
-);
+const outerBandPoints = computed(() => bandBetween('p10', 'p90')); // 10–90 %
+const innerBandPoints = computed(() => bandBetween('p25', 'p75')); // 25–75 % (likely range)
+
+const seriesPoints = (key) =>
+  props.data.map((d, i) => `${px(i).toFixed(2)},${py(d[key]).toFixed(2)}`).join(' ');
+const medianPoints = computed(() => seriesPoints('p50'));
+const p10Points = computed(() => seriesPoints('p10')); // "schlechter Markt" guide line
 
 const activeData = computed(() =>
   activeYear.value === null ? null : props.data.find((d) => d.year === activeYear.value) || null,
@@ -57,9 +61,10 @@ function tooltipRows(d) {
   if (!d) return [];
   return [
     { head: `Alter ${d.age} (Jahr ${d.year})` },
-    { amount: formatEUR(d.p90), label: 'günstiger Markt (90 %)', cls: 'gain-pos' },
+    { amount: formatEUR(d.p90), label: 'günstig (90 %)', cls: 'gain-pos' },
     { amount: formatEUR(d.p50), label: 'Median', cls: 'gain-total' },
-    { amount: formatEUR(d.p10), label: 'ungünstig (10 %)', cls: d.p10 <= 0 ? 'gain-neg' : 'tt-muted' },
+    { amount: `${formatEUR(d.p25)} – ${formatEUR(d.p75)}`, label: 'wahrscheinlich (25–75 %)', cls: 'tt-muted' },
+    { amount: formatEUR(d.p10), label: 'schlechter Markt (10 %)', cls: d.p10 <= 0 ? 'gain-neg' : 'tt-muted' },
   ];
 }
 </script>
@@ -68,10 +73,16 @@ function tooltipRows(d) {
   <div class="chart chart--withdrawal">
     <div class="chart-legend">
       <span class="legend-item">
-        <span class="legend-swatch legend-swatch--band"></span>10–90 % der Szenarien
+        <span class="legend-swatch legend-swatch--band"></span>10–90 %
+      </span>
+      <span class="legend-item">
+        <span class="legend-swatch legend-swatch--band-inner"></span>25–75 %
       </span>
       <span class="legend-item">
         <span class="legend-swatch legend-swatch--line legend-swatch--median"></span>Median
+      </span>
+      <span class="legend-item">
+        <span class="legend-swatch legend-swatch--line legend-swatch--p10"></span>schlechter Markt
       </span>
     </div>
 
@@ -86,7 +97,9 @@ function tooltipRows(d) {
         </div>
 
         <svg class="fan-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <polygon class="fan-band" :points="bandPoints" />
+          <polygon class="fan-band" :points="outerBandPoints" />
+          <polygon class="fan-band fan-band--inner" :points="innerBandPoints" />
+          <polyline class="fan-p10" :points="p10Points" vector-effect="non-scaling-stroke" />
           <polyline class="fan-median" :points="medianPoints" vector-effect="non-scaling-stroke" />
         </svg>
 

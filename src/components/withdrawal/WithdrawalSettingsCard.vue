@@ -11,6 +11,7 @@ import {
   withdrawalVolatility,
   targetSuccessRate,
   etfCostRate,
+  vpwReturn,
 } from '../../composables/useInvestmentStore.js';
 </script>
 
@@ -20,7 +21,7 @@ import {
 
     <div class="setting-group">
       <span class="setting-label-text">Entnahme-Art</span>
-      <div class="segmented" role="radiogroup" aria-label="Entnahme-Art">
+      <div class="segmented segmented--3" role="radiogroup" aria-label="Entnahme-Art">
         <button
           type="button"
           class="segmented-btn"
@@ -28,7 +29,7 @@ import {
           :aria-pressed="withdrawalMode === 'nominal'"
           @click="withdrawalMode = 'nominal'"
         >
-          Nominal konstant
+          Nominal
         </button>
         <button
           type="button"
@@ -37,17 +38,40 @@ import {
           :aria-pressed="withdrawalMode === 'real'"
           @click="withdrawalMode = 'real'"
         >
-          Real konstant
+          Real
+        </button>
+        <button
+          type="button"
+          class="segmented-btn"
+          :class="{ active: withdrawalMode === 'dynamic' }"
+          :aria-pressed="withdrawalMode === 'dynamic'"
+          @click="withdrawalMode = 'dynamic'"
+        >
+          Dynamisch
         </button>
       </div>
       <span class="setting-help">
-        {{ withdrawalMode === 'real'
-          ? 'Auszahlung steigt mit der Inflation – Kaufkraft bleibt konstant'
-          : 'Auszahlung in Euro bleibt konstant – Kaufkraft sinkt über die Zeit' }}
+        {{ withdrawalMode === 'dynamic'
+          ? 'VPW: jedes Jahr ein neu berechneter Anteil des aktuellen Depots – mehr in guten, weniger in schlechten Jahren. Zehrt das Kapital planmäßig bis zum Endalter auf, statt reich zu sterben.'
+          : withdrawalMode === 'real'
+            ? 'Auszahlung steigt mit der Inflation – Kaufkraft bleibt konstant'
+            : 'Auszahlung in Euro bleibt konstant – Kaufkraft sinkt über die Zeit' }}
       </span>
     </div>
 
-    <div class="setting-group">
+    <div v-if="withdrawalMode === 'dynamic'" class="setting-group">
+      <label class="setting-label-text">Kalkulations-Rendite <span class="muted">(real)</span></label>
+      <div class="setting-row">
+        <input type="number" v-model.number="vpwReturn" min="0" max="10" step="0.1" />
+        <span class="setting-value">{{ vpwReturn.toFixed(1) }} %</span>
+      </div>
+      <input type="range" v-model.number="vpwReturn" min="0" max="10" step="0.1" />
+      <span class="setting-help">
+        Bestimmt nur die Entnahmehöhe (Amortisation), nicht die simulierte Marktrendite. Höher = mehr jetzt, kleinerer Puffer.
+      </span>
+    </div>
+
+    <div v-if="withdrawalMode !== 'dynamic'" class="setting-group">
       <label class="setting-label">
         <input type="checkbox" v-model="allowCapitalDecay" />
         <span>Kapital aufzehren erlauben</span>
