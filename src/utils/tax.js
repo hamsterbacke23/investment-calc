@@ -26,6 +26,8 @@ export function taxOnGain(realizedGain) {
 // Verified German tax / social-insurance constants — Stand 2026.
 // Sources: gesetze-im-internet.de (§32a, §22, §9a EStG; InvStG 2018 §§18-20),
 // BMF Basiszins-Schreiben 2025/2026, DRV (Besteuerungsanteil, KVdR), GKV-SV.
+// Herleitung, Quellen pro Konstante & Update-Checkliste fürs Folgejahr:
+// ../../docs/tax-constants-2026.md
 // ===========================================================================
 
 // --- §32a EStG income-tax tariff (Grundtarif, single) ---------------------
