@@ -96,7 +96,7 @@ function incomeRows(d) {
   const depot = Math.max(0, d.p50 - pension - prepay);
   const proj = {
     kind: 'proj',
-    label: 'Voraussichtliches Netto-Einkommen · Median',
+    label: 'Netto-Einkommen · Median-Projektion',
     value: `~${formatEUR(d.p50)}/Mon · ${formatEUR(d.p50 * 12)}/Jahr`,
     range: `Spanne ${formatEUR(d.p10)}–${formatEUR(d.p90)}/Mon · schlechter–guter Markt (P10–P90)`,
   };
@@ -112,7 +112,7 @@ function incomeRows(d) {
     { head: `Alter ${d.age}` },
     {
       kind: 'rate',
-      label: 'Entnahmerate · fest, unabhängig vom Markt',
+      label: 'Entnahmerate · fix',
       value: `${ratePct} %`,
       note: prepay > 0
         ? '× dein aktueller Depotwert — deine VPW-Entnahme; zzgl. Renten-Vorauszahlung (s. u.)'
