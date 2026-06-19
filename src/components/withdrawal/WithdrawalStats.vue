@@ -51,25 +51,34 @@ const capitalNote = computed(() => {
   return t.mode === 'real' ? 'real erhalten' : 'nominal erhalten';
 });
 
-// Plain-language headline: the available monthly TOTAL income (range) + trend.
-const klartext = computed(() => {
+// Plain-language headline, split into parts so the € amounts can share the same
+// serif (old-style figures) treatment as the phase totals below — consistent.
+const lead = computed(() => {
   const t = info.value;
   const ph = t.phases || [];
-  if (!ph.length) return '';
+  if (!ph.length) return null;
   // Range over the "living" phases (everything but the final year); the end is
   // stated separately so a decline to the end isn't hidden inside the range.
   const early = (ph.length > 1 ? ph.slice(0, -1) : ph).map((p) => p.total);
   const end = ph[ph.length - 1].total;
   const lo = Math.min(...early);
   const hi = Math.max(...early);
-  const penTxt = t.hasPension ? `, inkl. Rente ab ${t.pensionStartAge}` : '';
-  const head = hi - lo > Math.max(150, hi * 0.04)
-    ? `~${formatNumber(lo)}–${formatNumber(hi)} €`
-    : `~${formatNumber(hi)} €`;
-  let tail = '';
-  if (end < lo * 0.97) tail = ` Sinkt bis zum Ende auf ~${formatNumber(end)} €.`;
-  else if (end > hi * 1.03) tail = ` Steigt bis zum Ende auf ~${formatNumber(end)} €.`;
-  return `Monatlich verfügbar: ${head} — netto, heutiges Geld${penTxt}.${tail}`;
+  const range = hi - lo > Math.max(150, hi * 0.04)
+    ? `${formatNumber(lo)}–${formatNumber(hi)} €`
+    : `${formatNumber(hi)} €`;
+  const penText = t.hasPension ? `, inkl. Rente ab ${t.pensionStartAge}` : '';
+  // Build the sentence so all spacing/punctuation lives in the interpolated text
+  // (Vue trims whitespace at element boundaries); only the € amounts are spans.
+  const verb = end < lo * 0.97 ? 'Sinkt' : end > hi * 1.03 ? 'Steigt' : null;
+  return {
+    pre: 'Monatlich verfügbar: ~',
+    range,
+    mid: verb
+      ? ` — netto, heutiges Geld${penText}. ${verb} bis zum Ende auf ~`
+      : ` — netto, heutiges Geld${penText}.`,
+    endAmount: verb ? `${formatNumber(end)} €` : null,
+    post: verb ? '.' : '',
+  };
 });
 
 // One sentence tying the number to the curve shape in the chart.
@@ -160,7 +169,7 @@ const shapeNote = computed(() => {
     <div class="stat-card highlighted hero-income">
       <label>Monatliches Einkommen · netto · heutige Kaufkraft</label>
 
-      <p class="hero-klartext">{{ klartext }}</p>
+      <p v-if="lead" class="hero-klartext">{{ lead.pre }}<span class="klartext-amount">{{ lead.range }}</span>{{ lead.mid }}<span v-if="lead.endAmount" class="klartext-amount">{{ lead.endAmount }}</span>{{ lead.post }}</p>
 
       <dl class="phase-list">
         <div v-for="ph in info.phases" :key="ph.label" class="phase-row">

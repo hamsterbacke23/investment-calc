@@ -1705,9 +1705,17 @@ input[type="range"]::-moz-range-thumb {
 .hero-klartext {
   margin: 0.35rem 0 0.9rem;
   font-size: 0.95rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: hsl(var(--foreground));
-  font-variant-numeric: tabular-nums;
+}
+
+/* € amounts in the headline share the serif old-style figures of the phase totals. */
+.klartext-amount {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.2em;
+  font-weight: 600;
+  color: hsl(var(--primary));
+  white-space: nowrap;
 }
 
 .phase-list {
@@ -1744,13 +1752,13 @@ input[type="range"]::-moz-range-thumb {
   white-space: nowrap;
 }
 
-.phase-dd { margin: 0.1rem 0 0; display: flex; flex-direction: column; gap: 0.05rem; }
+.phase-dd { margin: 0.15rem 0 0; display: flex; flex-direction: column; gap: 0.4rem; }
 
 .phase-total {
   font-family: 'Cormorant Garamond', Georgia, serif;
   font-size: 1.7rem;
   font-weight: 600;
-  line-height: 1.05;
+  line-height: 1.25;
   letter-spacing: -0.01em;
   color: hsl(var(--primary));
   font-variant-numeric: tabular-nums;
@@ -2001,6 +2009,13 @@ input[type="range"]::-moz-range-thumb {
 
   .stat-card { padding: 1rem 1.15rem; }
   .stat-card h2 { font-size: 1.35rem; }
+
+  /* The view root carries `z-index: 1` (from `.app-container > *`), which traps
+     the fixed drawer below in a root-level z-1 stacking context. Release it here
+     so the drawer's own z-index is compared at the root — above the backdrop
+     (z-55), below the FAB (z-70). Without this the blurred backdrop paints over
+     the drawer too. */
+  .grid-layout { z-index: auto; }
 
   /* Sidebar becomes an off-canvas drawer; results stay the primary view. */
   .sidebar {
