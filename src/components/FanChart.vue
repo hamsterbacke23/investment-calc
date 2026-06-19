@@ -1,14 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { formatEUR, formatCompactEUR } from '../utils/tax.js';
+import FanTooltipContent from './FanTooltipContent.vue';
 
 // Depot-balance uncertainty cone from the Monte-Carlo simulation: a shaded
 // 10–90 % band with the median (p50) line. Mirrors BarChart's container layout
 // so both chart modes share the same frame, axes and tooltip styling.
 const props = defineProps({
-  data: { type: Array, required: true }, // [{ year, age, p10, p50, p90 }]
+  data: { type: Array, required: true }, // [{ year, age, p10, p50, p90, rate?, pension? }]
   xLabelFn: { type: Function, default: null },
   caption: { type: String, default: '' },
+  // 'wealth' → depot percentiles; 'income' → rate-led VPW income tooltip.
+  variant: { type: String, default: 'wealth' },
 });
 
 const activeYear = ref(null);
@@ -59,6 +62,7 @@ const activeData = computed(() =>
 
 function tooltipRows(d) {
   if (!d) return [];
+  if (props.variant === 'income') return incomeRows(d);
   return [
     { head: `Alter ${d.age} (Jahr ${d.year})` },
     { amount: formatEUR(d.p90), label: 'günstig (90 %)', cls: 'gain-pos' },
@@ -67,10 +71,39 @@ function tooltipRows(d) {
     { amount: formatEUR(d.p10), label: 'schlechter Markt (10 %)', cls: d.p10 <= 0 ? 'gain-neg' : 'tt-muted' },
   ];
 }
+
+// VPW/income tooltip. The withdrawal RATE leads — it is the one deterministic,
+// actionable figure (same in every market scenario). The € amounts beneath are
+// the median PROJECTION (incl. net pension) and are deliberately subordinate, so
+// nobody reads them as a fixed promise.
+function incomeRows(d) {
+  const ratePct = (d.rate * 100).toFixed(1).replace('.', ',');
+  const pension = d.pension || 0;
+  const depot = Math.max(0, d.p50 - pension);
+  const proj = {
+    kind: 'proj',
+    label: 'Voraussichtliches Netto-Einkommen · Median',
+    value: `~${formatEUR(d.p50)}/Mon · ${formatEUR(d.p50 * 12)}/Jahr`,
+    range: `Spanne ${formatEUR(d.p10)}–${formatEUR(d.p90)}/Mon · schlechter–guter Markt (P10–P90)`,
+  };
+  if (pension > 0) {
+    proj.split = `davon Depot ${formatEUR(depot)} · Rente ${formatEUR(pension)}`;
+  }
+  return [
+    { head: `Alter ${d.age}` },
+    {
+      kind: 'rate',
+      label: 'Entnahmerate · fest, unabhängig vom Markt',
+      value: `${ratePct} %`,
+      note: '× dein aktueller Depotwert = was du dieses Jahr verkaufst',
+    },
+    proj,
+  ];
+}
 </script>
 
 <template>
-  <div class="chart chart--withdrawal">
+  <div class="chart chart--withdrawal" :class="{ 'chart--income': variant === 'income' }">
     <div class="chart-legend">
       <span class="legend-item">
         <span class="legend-swatch legend-swatch--band"></span>10–90 %
@@ -116,25 +149,13 @@ function tooltipRows(d) {
             :aria-label="`Details für Alter ${d.age}`"
           >
             <span class="tooltip">
-              <span v-for="(r, ri) in tooltipRows(d)" :key="ri" class="tt-row" :class="r.cls">
-                <strong v-if="r.head" class="tt-head">{{ r.head }}</strong>
-                <template v-else>
-                  <span class="tt-amount">{{ r.amount }}</span>
-                  <span v-if="r.label" class="tt-label">{{ r.label }}</span>
-                </template>
-              </span>
+              <FanTooltipContent :rows="tooltipRows(d)" />
             </span>
           </div>
         </div>
 
         <div v-if="activeData" class="mobile-tooltip" aria-live="polite">
-          <span v-for="(r, ri) in tooltipRows(activeData)" :key="ri" class="tt-row" :class="r.cls">
-            <strong v-if="r.head" class="tt-head">{{ r.head }}</strong>
-            <template v-else>
-              <span class="tt-amount">{{ r.amount }}</span>
-              <span v-if="r.label" class="tt-label">{{ r.label }}</span>
-            </template>
-          </span>
+          <FanTooltipContent :rows="tooltipRows(activeData)" />
         </div>
       </div>
 

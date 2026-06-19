@@ -68,6 +68,7 @@ const ageLabel = (d) => String(d.age);
       <FanChart
         v-if="chartMode === 'income' && isDynamic"
         :data="withdrawalIncomeBands"
+        variant="income"
         :x-label-fn="ageLabel"
         caption="Alter · monatliches Nettoeinkommen (heutige Kaufkraft, inkl. Rente ab Renteneintritt) — Median + Spanne aus 1.000 Marktszenarien; gestrichelt = P10 (1 von 10 schlechter)"
       />

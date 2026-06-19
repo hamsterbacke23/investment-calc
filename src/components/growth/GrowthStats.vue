@@ -50,7 +50,14 @@ const scenarioLabel = { worst: 'Worst Case', avg: 'Mittelwert', best: 'Best Case
   <RouterLink to="/withdrawal" class="withdrawal-cta">
     <div class="cta-text">
       <span class="cta-label">Entnahmephase planen</span>
-      <span class="cta-headline">
+      <!-- VPW spends a re-computed share of the depot each year, so the headline
+           is the start rate (the actionable, deterministic figure) rather than a
+           fixed €/Monat; the fixed modes keep their constant net amount. -->
+      <span v-if="withdrawalTaxInfo.isDynamic" class="cta-headline">
+        ≈ {{ withdrawalTaxInfo.vpwStartRatePct.replace('.', ',') }} % deines Depots / Jahr
+        <span class="cta-detail">dynamisch · ≈ {{ formatEUR(withdrawalTaxInfo.monthlyRealStart) }}/Monat im Median über {{ withdrawalPlanYears }} Jahre</span>
+      </span>
+      <span v-else class="cta-headline">
         ≈ {{ formatEUR(withdrawalTaxInfo.monthlyNet) }} / Monat
         <span class="cta-detail">netto über {{ withdrawalPlanYears }} Jahre</span>
       </span>

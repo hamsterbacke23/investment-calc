@@ -340,6 +340,13 @@ export function computeWithdrawalPlan(modeOverride) {
         p50: Math.round(percentile(sorted, 50) / 12),
         p75: Math.round(percentile(sorted, 75) / 12),
         p90: Math.round(percentile(sorted, 90) / 12),
+        // Deterministic VPW withdrawal rate for this age — depends only on g and
+        // the remaining years (full duration in year 1, then −1/yr), identical in
+        // every market scenario. This is the exact rate the simulation applies.
+        rate: vpwRate(g, n - y),
+        // Net statutory pension for this age (today's purchasing power, monthly).
+        // Deterministic too → lets the tooltip split the median into depot + Rente.
+        pension: Math.round(pensionNetNominalOf(y + 1) / realFactorOf(y + 1) / 12),
       });
     }
   }

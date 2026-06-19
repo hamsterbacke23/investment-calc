@@ -434,6 +434,10 @@ input[type="range"]::-moz-range-thumb {
   background: transparent !important;
   animation: none !important;
   border-radius: 0 !important;
+  /* Full-height hit target so hover/tap anywhere over the column reveals the
+     tooltip — without this the empty flex-item collapses to 0 px and nothing
+     is hoverable. */
+  height: 100%;
 }
 
 .fan-col:hover,
@@ -675,6 +679,16 @@ input[type="range"]::-moz-range-thumb {
 .bar:hover .tooltip { display: block; }
 .bar.active .tooltip { display: block; }
 
+/* Fan-chart hover columns span the full plot height, so the default "above the
+   bar" anchor would float the tooltip over the legend/toggle. Pin it inside the
+   plot (top) instead — the tooltip describes the whole age-column, not a single
+   y-value — and drop the pointer arrow. */
+.fan-col .tooltip {
+  bottom: auto;
+  top: 6px;
+}
+.fan-col .tooltip::after { display: none; }
+
 .mobile-tooltip { display: none; }
 
 /* Tooltip rows — shared by hover + mobile tooltip */
@@ -713,6 +727,75 @@ input[type="range"]::-moz-range-thumb {
 @media (prefers-color-scheme: dark) {
   .gain-deposit .tt-amount { color: #5cc2d0; }
   .gain-pension .tt-amount { color: #e8b766; }
+}
+
+/* --- Rich VPW/income tooltip ---------------------------------------------
+   The withdrawal RATE is the lead (large serif, primary): one deterministic,
+   actionable number. The € projection beneath is deliberately quieter (small,
+   muted, sans) so it never reads as a fixed promise. */
+.chart--income .tooltip { white-space: normal; min-width: 218px; max-width: 252px; }
+
+.tt-rate-block { display: block; margin: 2px 0 0; }
+
+.tt-rate-label {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: hsl(var(--muted-foreground));
+}
+
+.tt-rate {
+  display: block;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.85rem;
+  font-weight: 600;
+  line-height: 1.05;
+  color: hsl(var(--primary));
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0 3px;
+}
+
+.tt-rate-note {
+  display: block;
+  font-size: 0.64rem;
+  line-height: 1.35;
+  color: hsl(var(--muted-foreground));
+}
+
+.tt-proj-block {
+  display: block;
+  border-top: 1px solid hsl(var(--border));
+  margin-top: 7px;
+  padding-top: 6px;
+}
+
+.tt-proj-label {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
+}
+
+.tt-proj {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--foreground));
+  margin-top: 2px;
+}
+
+.tt-sub {
+  display: block;
+  font-size: 0.64rem;
+  line-height: 1.4;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
 }
 
 /* --- Stats --- */
