@@ -822,6 +822,19 @@ input[type="range"]::-moz-range-thumb {
   margin-top: 2px;
 }
 
+/* On mobile the tooltip is a tap-popover laid over a small chart, so trim the
+   rich income layout — smaller rate, tighter blocks/line-heights — to free up
+   the band underneath. Scoped to .mobile-tooltip; desktop hover keeps full size. */
+.mobile-tooltip .tt-rate { font-size: 1.45rem; margin: 1px 0 2px; }
+.mobile-tooltip .tt-rate-note,
+.mobile-tooltip .tt-sub { line-height: 1.25; }
+.mobile-tooltip .tt-proj-block { margin-top: 5px; padding-top: 5px; }
+.mobile-tooltip .tt-proj { font-size: 0.74rem; }
+/* The uppercase labels are the main height driver — tighten tracking so they
+   wrap less, reclaiming a line or two without shrinking the readable text. */
+.mobile-tooltip .tt-rate-label,
+.mobile-tooltip .tt-proj-label { letter-spacing: 0.02em; }
+
 /* --- Stats --- */
 .stats-grid {
   display: grid;
