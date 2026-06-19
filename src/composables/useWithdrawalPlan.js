@@ -347,6 +347,10 @@ export function computeWithdrawalPlan(modeOverride) {
         // Net statutory pension for this age (today's purchasing power, monthly).
         // Deterministic too → lets the tooltip split the median into depot + Rente.
         pension: Math.round(pensionNetNominalOf(y + 1) / realFactorOf(y + 1) / 12),
+        // Income-bridge pre-payment drawn from the depot in the pre-pension years
+        // (0 otherwise). It rides on TOP of rate×depot, so the tooltip must show it
+        // separately — else the leading rate understates the real depot sale.
+        bridgePrepay: Math.round(bridgeSupp[y] / realFactorOf(y + 1) / 12),
       });
     }
   }

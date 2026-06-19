@@ -23,6 +23,11 @@ const clearTooltip = () => {
 };
 defineExpose({ clearTooltip });
 
+// Mouse hover drives the active point (so the on-chart marker tracks the cursor);
+// touch is left to the click toggle so a tap doesn't immediately clear itself.
+const hoverEnter = (e, year) => { if (e.pointerType === 'mouse') activeYear.value = year; };
+const hoverLeave = (e) => { if (e.pointerType === 'mouse') activeYear.value = null; };
+
 const currentYear = new Date().getFullYear();
 
 const maxScale = computed(() => Math.max(1, ...props.data.map((d) => d.p90)));
@@ -60,6 +65,14 @@ const activeData = computed(() =>
   activeYear.value === null ? null : props.data.find((d) => d.year === activeYear.value) || null,
 );
 
+// On-chart marker for the hovered/tapped age: a vertical guide at the point's x
+// and a dot on the median, so it's clear which column the tooltip describes.
+const activeIndex = computed(() =>
+  activeYear.value === null ? -1 : props.data.findIndex((d) => d.year === activeYear.value),
+);
+const activeX = computed(() => (activeIndex.value < 0 ? 0 : px(activeIndex.value)));
+const activeY = computed(() => (activeData.value ? py(activeData.value.p50) : 0));
+
 function tooltipRows(d) {
   if (!d) return [];
   if (props.variant === 'income') return incomeRows(d);
@@ -79,14 +92,20 @@ function tooltipRows(d) {
 function incomeRows(d) {
   const ratePct = (d.rate * 100).toFixed(1).replace('.', ',');
   const pension = d.pension || 0;
-  const depot = Math.max(0, d.p50 - pension);
+  const prepay = d.bridgePrepay || 0; // pre-pension years: depot pre-pays ~the pension
+  const depot = Math.max(0, d.p50 - pension - prepay);
   const proj = {
     kind: 'proj',
     label: 'Voraussichtliches Netto-Einkommen · Median',
     value: `~${formatEUR(d.p50)}/Mon · ${formatEUR(d.p50 * 12)}/Jahr`,
     range: `Spanne ${formatEUR(d.p10)}–${formatEUR(d.p90)}/Mon · schlechter–guter Markt (P10–P90)`,
   };
-  if (pension > 0) {
+  // Decompose the median into its sources. During the income-bridge years the
+  // depot draws the VPW amount PLUS a pension pre-payment, so the rate alone is
+  // NOT the full depot sale — name that extra slice rather than imply it away.
+  if (prepay > 0) {
+    proj.split = `davon VPW ${formatEUR(depot)} · Renten-Vorauszahlung ${formatEUR(prepay)} (aus Depot)`;
+  } else if (pension > 0) {
     proj.split = `davon Depot ${formatEUR(depot)} · Rente ${formatEUR(pension)}`;
   }
   return [
@@ -95,7 +114,9 @@ function incomeRows(d) {
       kind: 'rate',
       label: 'Entnahmerate · fest, unabhängig vom Markt',
       value: `${ratePct} %`,
-      note: '× dein aktueller Depotwert = was du dieses Jahr verkaufst',
+      note: prepay > 0
+        ? '× dein aktueller Depotwert — deine VPW-Entnahme; zzgl. Renten-Vorauszahlung (s. u.)'
+        : '× dein aktueller Depotwert = was du dieses Jahr verkaufst',
     },
     proj,
   ];
@@ -136,12 +157,23 @@ function incomeRows(d) {
           <polyline class="fan-median" :points="medianPoints" vector-effect="non-scaling-stroke" />
         </svg>
 
+        <div
+          v-if="activeData"
+          class="fan-marker"
+          :style="{ left: activeX + '%' }"
+          aria-hidden="true"
+        >
+          <span class="fan-marker-dot" :style="{ top: activeY + '%' }"></span>
+        </div>
+
         <div class="bars fan-hover">
           <div
             v-for="d in data"
             :key="d.year"
             class="bar fan-col"
             :class="{ active: activeYear === d.year }"
+            @pointerenter="hoverEnter($event, d.year)"
+            @pointerleave="hoverLeave($event)"
             @click.stop="toggle(d.year)"
             @keydown.enter.stop.prevent="toggle(d.year)"
             tabindex="0"
