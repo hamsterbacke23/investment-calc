@@ -17,15 +17,30 @@ export const initialCapital = ref(30000);
 export const durationYears = ref(15);
 export const reinvestGains = ref(true);
 export const inflationRate = ref(2.5);
+// Rendite is given as a BAND [rateMin, rateMax] per phase rather than a single
+// figure. `returnScenario` then picks which edge of every band drives the
+// projection (and the Endkapital handed to the withdrawal phase):
+//   'avg'   → midpoint of the band (default)
+//   'worst' → lower edge
+//   'best'  → upper edge
 export const yieldPhases = ref([
-  { id: 1, startYear: 1, endYear: 15, rate: 6, customDuration: false },
+  { id: 1, startYear: 1, endYear: 15, rateMin: 4, rateMax: 8, customDuration: false },
 ]);
+export const returnScenario = ref('avg'); // 'avg' | 'worst' | 'best'
+
+// Resolve a phase's band to the single annual rate (%) for a given scenario.
+export function scenarioRate(phase, scenario = returnScenario.value) {
+  const lo = Math.min(Number(phase.rateMin), Number(phase.rateMax));
+  const hi = Math.max(Number(phase.rateMin), Number(phase.rateMax));
+  if (scenario === 'worst') return lo;
+  if (scenario === 'best') return hi;
+  return (lo + hi) / 2;
+}
 export const transactions = ref([
   { id: 1, name: 'Sparplan', amount: 500, type: 'monthly', startYear: 1, endYear: 15, customDuration: false },
 ]);
 
 // --- Withdrawal phase state ---
-export const withdrawalRate = ref(4);
 export const withdrawalPlanYears = ref(30);
 export const allowCapitalDecay = ref(true);
 export const withdrawalReturnRate = ref(6);
@@ -33,10 +48,21 @@ export const withdrawalReturnRate = ref(6);
 export const withdrawalMode = ref('nominal');
 
 // --- Pension (Gesetzliche Rente) ---
-// pensionMonthly is given in today's purchasing power (€/Monat).
+// pensionMonthly is given in today's purchasing power (€/Monat, brutto).
 export const pensionMonthly = ref(0);
 export const pensionStartAge = ref(67);
 export const withdrawalStartAge = ref(60);
+// Pflegeversicherung surcharge for the childless is higher; drives the KV/PV
+// deduction applied to the gross pension.
+export const pensionHasChildren = ref(true);
+
+// --- Monte-Carlo / advanced (sensible defaults, hidden behind "Erweiterte Einstellungen") ---
+// Annual volatility (stdev) of the depot return — drives the spread of scenarios.
+export const withdrawalVolatility = ref(15);
+// Solve the withdrawal so this share of simulated market paths survives the plan.
+export const targetSuccessRate = ref(90);
+// All-in annual product cost (TER + spreads), subtracted from the gross return.
+export const etfCostRate = ref(0.2);
 
 // --- URL state sharing ---
 export function encodeState() {
@@ -45,7 +71,6 @@ export function encodeState() {
     dy: durationYears.value,
     rg: reinvestGains.value ? 1 : 0,
     ir: inflationRate.value,
-    wr: withdrawalRate.value,
     wpy: withdrawalPlanYears.value,
     acd: allowCapitalDecay.value ? 1 : 0,
     wrr: withdrawalReturnRate.value,
@@ -53,7 +78,12 @@ export function encodeState() {
     pm: pensionMonthly.value,
     psa: pensionStartAge.value,
     wsa: withdrawalStartAge.value,
-    yp: yieldPhases.value.map(p => ({ s: p.startYear, e: p.endYear, r: p.rate, cd: p.customDuration ? 1 : 0 })),
+    phc: pensionHasChildren.value ? 1 : 0,
+    vol: withdrawalVolatility.value,
+    tsr: targetSuccessRate.value,
+    cost: etfCostRate.value,
+    rsc: returnScenario.value,
+    yp: yieldPhases.value.map(p => ({ s: p.startYear, e: p.endYear, lo: p.rateMin, hi: p.rateMax, cd: p.customDuration ? 1 : 0 })),
     tr: transactions.value.map(tx => ({ n: tx.name, a: tx.amount, tp: tx.type === 'monthly' ? 'm' : 'o', s: tx.startYear, e: tx.endYear, cd: tx.customDuration ? 1 : 0 })),
   };
   return toBase64(JSON.stringify(data));
@@ -64,7 +94,6 @@ function applyState(data) {
   if (data.dy !== undefined) durationYears.value = data.dy;
   if (data.rg !== undefined) reinvestGains.value = !!data.rg;
   if (data.ir !== undefined) inflationRate.value = data.ir;
-  if (data.wr !== undefined) withdrawalRate.value = Math.min(10, Math.max(1, Number(data.wr)));
   if (data.wpy !== undefined) withdrawalPlanYears.value = Math.min(80, Math.max(1, Number(data.wpy)));
   if (data.acd !== undefined) allowCapitalDecay.value = !!data.acd;
   if (data.wrr !== undefined) withdrawalReturnRate.value = Math.min(20, Math.max(0, Number(data.wrr)));
@@ -72,10 +101,25 @@ function applyState(data) {
   if (data.pm !== undefined) pensionMonthly.value = Math.max(0, Number(data.pm) || 0);
   if (data.psa !== undefined) pensionStartAge.value = Math.min(80, Math.max(50, Number(data.psa) || 67));
   if (data.wsa !== undefined) withdrawalStartAge.value = Math.min(90, Math.max(30, Number(data.wsa) || 60));
+  if (data.phc !== undefined) pensionHasChildren.value = !!data.phc;
+  if (data.vol !== undefined) withdrawalVolatility.value = Math.min(40, Math.max(0, Number(data.vol)));
+  if (data.tsr !== undefined) targetSuccessRate.value = Math.min(99, Math.max(50, Number(data.tsr)));
+  if (data.cost !== undefined) etfCostRate.value = Math.min(3, Math.max(0, Number(data.cost)));
+  if (data.rsc === 'worst' || data.rsc === 'best' || data.rsc === 'avg') returnScenario.value = data.rsc;
   if (data.yp) {
-    yieldPhases.value = data.yp.map((p, i) => ({
-      id: i + 1, startYear: p.s, endYear: p.e, rate: p.r, customDuration: !!p.cd,
-    }));
+    // Coerce + clamp like the scalar fields above, so a hand-edited/garbage
+    // share link can't push NaN/out-of-range rates into the projection.
+    const clampRate = (v, fallback) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(20, Math.max(-15, n)) : fallback;
+    };
+    yieldPhases.value = data.yp.map((p, i) => {
+      // Newer links carry a band (lo/hi); older links only a single rate (r).
+      const hasBand = p.lo !== undefined || p.hi !== undefined;
+      const lo = clampRate(hasBand ? p.lo : p.r, 5);
+      const hi = clampRate(hasBand ? p.hi : p.r, lo);
+      return { id: i + 1, startYear: p.s, endYear: p.e, rateMin: lo, rateMax: hi, customDuration: !!p.cd };
+    });
   }
   if (data.tr) {
     transactions.value = data.tr.map((t, i) => ({
@@ -110,8 +154,8 @@ function saveToLocal() {
     initialCapital: initialCapital.value,
     durationYears: durationYears.value,
     reinvestGains: reinvestGains.value,
-    withdrawalRate: withdrawalRate.value,
     inflationRate: inflationRate.value,
+    returnScenario: returnScenario.value,
     yieldPhases: yieldPhases.value,
     transactions: transactions.value,
     withdrawalPlanYears: withdrawalPlanYears.value,
@@ -121,6 +165,10 @@ function saveToLocal() {
     pensionMonthly: pensionMonthly.value,
     pensionStartAge: pensionStartAge.value,
     withdrawalStartAge: withdrawalStartAge.value,
+    pensionHasChildren: pensionHasChildren.value,
+    withdrawalVolatility: withdrawalVolatility.value,
+    targetSuccessRate: targetSuccessRate.value,
+    etfCostRate: etfCostRate.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
@@ -133,10 +181,6 @@ export function loadFromLocal() {
     initialCapital.value = parsed.initialCapital;
     durationYears.value = parsed.durationYears;
     if (parsed.reinvestGains !== undefined) reinvestGains.value = parsed.reinvestGains;
-    if (parsed.withdrawalRate !== undefined) {
-      const rate = Number(parsed.withdrawalRate);
-      withdrawalRate.value = Number.isFinite(rate) ? Math.min(10, Math.max(1, rate)) : 4;
-    }
     if (parsed.inflationRate !== undefined) {
       const rate = Number(parsed.inflationRate);
       inflationRate.value = Number.isFinite(rate) ? Math.min(20, Math.max(0, rate)) : 2.5;
@@ -165,17 +209,44 @@ export function loadFromLocal() {
       const v = Number(parsed.withdrawalStartAge);
       withdrawalStartAge.value = Number.isFinite(v) ? Math.min(90, Math.max(30, v)) : 60;
     }
-    yieldPhases.value = parsed.yieldPhases.map((p) => {
-      if (p.customDuration === undefined) p.customDuration = false;
-      return p;
-    });
-    transactions.value = parsed.transactions.map((t) => {
-      if (t.duration !== undefined && t.endYear === undefined) {
-        return { ...t, endYear: t.startYear + t.duration - 1, duration: undefined, customDuration: true };
-      }
-      if (t.customDuration === undefined) t.customDuration = false;
-      return t;
-    });
+    if (parsed.pensionHasChildren !== undefined) pensionHasChildren.value = !!parsed.pensionHasChildren;
+    if (parsed.withdrawalVolatility !== undefined) {
+      const v = Number(parsed.withdrawalVolatility);
+      withdrawalVolatility.value = Number.isFinite(v) ? Math.min(40, Math.max(0, v)) : 15;
+    }
+    if (parsed.targetSuccessRate !== undefined) {
+      const v = Number(parsed.targetSuccessRate);
+      targetSuccessRate.value = Number.isFinite(v) ? Math.min(99, Math.max(50, v)) : 90;
+    }
+    if (parsed.etfCostRate !== undefined) {
+      const v = Number(parsed.etfCostRate);
+      etfCostRate.value = Number.isFinite(v) ? Math.min(3, Math.max(0, v)) : 0.2;
+    }
+    if (parsed.returnScenario === 'worst' || parsed.returnScenario === 'best' || parsed.returnScenario === 'avg') {
+      returnScenario.value = parsed.returnScenario;
+    }
+    // Guard like every field above: a partial/corrupt blob missing these arrays
+    // must not throw (which the catch would swallow, wiping the whole restore).
+    if (Array.isArray(parsed.yieldPhases)) {
+      yieldPhases.value = parsed.yieldPhases.map((p) => {
+        const out = { ...p };
+        // Migrate single-rate phases (pre-band) to a collapsed band.
+        if (out.rateMin === undefined) out.rateMin = out.rate ?? 5;
+        if (out.rateMax === undefined) out.rateMax = out.rate ?? out.rateMin;
+        delete out.rate;
+        if (out.customDuration === undefined) out.customDuration = false;
+        return out;
+      });
+    }
+    if (Array.isArray(parsed.transactions)) {
+      transactions.value = parsed.transactions.map((t) => {
+        if (t.duration !== undefined && t.endYear === undefined) {
+          return { ...t, endYear: t.startYear + t.duration - 1, duration: undefined, customDuration: true };
+        }
+        if (t.customDuration === undefined) t.customDuration = false;
+        return t;
+      });
+    }
   } catch {
     /* ignore corrupt local storage */
   }
@@ -183,7 +254,7 @@ export function loadFromLocal() {
 
 // --- Mutators ---
 export const addPhase = () =>
-  yieldPhases.value.push({ id: Date.now(), startYear: 1, endYear: durationYears.value, rate: 5, customDuration: false });
+  yieldPhases.value.push({ id: Date.now(), startYear: 1, endYear: durationYears.value, rateMin: 3, rateMax: 7, customDuration: false });
 export const removePhase = (id) => (yieldPhases.value = yieldPhases.value.filter((p) => p.id !== id));
 
 export const addTransaction = () =>
@@ -210,8 +281,8 @@ export function initInvestmentStore() {
       initialCapital,
       durationYears,
       reinvestGains,
-      withdrawalRate,
       inflationRate,
+      returnScenario,
       yieldPhases,
       transactions,
       withdrawalPlanYears,
@@ -221,6 +292,10 @@ export function initInvestmentStore() {
       pensionMonthly,
       pensionStartAge,
       withdrawalStartAge,
+      pensionHasChildren,
+      withdrawalVolatility,
+      targetSuccessRate,
+      etfCostRate,
     ],
     () => saveToLocal(),
     { deep: true },

@@ -1,8 +1,17 @@
 <script setup>
-import { inflationRate, withdrawalPlanYears, durationYears } from '../../composables/useInvestmentStore.js';
-import { totalInvested, finalBalance, finalBalanceReal } from '../../composables/useGrowthCalculations.js';
+import { inflationRate, withdrawalPlanYears, durationYears, returnScenario } from '../../composables/useInvestmentStore.js';
+import {
+  totalInvested,
+  finalBalance,
+  finalBalanceReal,
+  finalBalanceWorst,
+  finalBalanceBest,
+  hasReturnBand,
+} from '../../composables/useGrowthCalculations.js';
 import { withdrawalTaxInfo } from '../../composables/useWithdrawalPlan.js';
 import { formatEUR } from '../../utils/tax.js';
+
+const scenarioLabel = { worst: 'Worst Case', avg: 'Mittelwert', best: 'Best Case' };
 </script>
 
 <template>
@@ -13,7 +22,10 @@ import { formatEUR } from '../../utils/tax.js';
     </div>
 
     <div class="stat-card highlighted final-balance-card">
-      <label>Endkapital</label>
+      <label>
+        Endkapital
+        <span v-if="hasReturnBand" class="scenario-tag">{{ scenarioLabel[returnScenario] }}</span>
+      </label>
       <h2 class="final-balance-headline">{{ formatEUR(finalBalance) }}</h2>
 
       <dl class="balance-breakdown">
@@ -22,6 +34,13 @@ import { formatEUR } from '../../utils/tax.js';
           <dd>
             <span class="delta">bei {{ inflationRate.toFixed(1) }}% Inflation über {{ durationYears }} Jahre</span>
             <span class="amount">{{ formatEUR(finalBalanceReal) }}</span>
+          </dd>
+        </div>
+        <div v-if="hasReturnBand" class="breakdown-row">
+          <dt>Bandbreite <span class="muted">Worst – Best</span></dt>
+          <dd>
+            <span class="delta">je nach Renditeverlauf</span>
+            <span class="amount amount--range">{{ formatEUR(finalBalanceWorst) }} – {{ formatEUR(finalBalanceBest) }}</span>
           </dd>
         </div>
       </dl>

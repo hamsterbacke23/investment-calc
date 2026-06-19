@@ -8,43 +8,81 @@ const info = computed(() => withdrawalTaxInfo.value);
 
 const monthlyTax = computed(() => info.value.monthlyGross - info.value.monthlyNet);
 
-// Capital status — driven by the chosen strategy, not the rounded end balance.
-// Warning colour only when the depot empties BEFORE the planned duration.
-const capitalStatus = computed(() => {
+// How safe is the plan? Drives the colour of the headline success number.
+const successTone = computed(() => {
+  const s = info.value.successRate;
+  if (s >= info.value.targetSuccess) return 'positive';
+  if (s >= info.value.targetSuccess - 10) return 'neutral';
+  return 'warn';
+});
+
+// "Wie lange reicht das Geld?" — phrased from the simulated depletion ages.
+const reach = computed(() => {
   const t = info.value;
-  if (t.depletedEarly) {
-    return { tone: 'warn', text: `erschöpft nach ${t.depletionYear} Jahren` };
+  if (t.lastYear === 0) return { headline: '–', sub: '' };
+  if (t.lastsFullHorizon) {
+    return {
+      headline: `volle ${t.lastYear} Jahre`,
+      sub: t.depletedEarly
+        ? `im Median bis Alter ${t.horizonEndAge} · schlechter Fall ab Alter ${t.p10ReachAge}`
+        : `im Median bis Alter ${t.horizonEndAge}`,
+    };
   }
-  if (allowCapitalDecay.value) {
-    return { tone: 'neutral', text: 'planmäßig aufgebraucht' };
-  }
-  return t.mode === 'real'
-    ? { tone: 'positive', text: 'real erhalten' }
-    : { tone: 'neutral', text: 'nominal erhalten · real schrumpfend' };
+  return {
+    headline: `bis Alter ${t.medianReachAge}`,
+    sub: t.depletedEarly
+      ? `schlechter Fall (10 % der Märkte): ab Alter ${t.p10ReachAge}`
+      : 'Median-Reichweite des Vermögens',
+  };
+});
+
+// One short note describing what happens to the remaining capital.
+const capitalNote = computed(() => {
+  const t = info.value;
+  if (t.depletedEarly) return 'in ungünstigen Märkten vorzeitig erschöpft';
+  if (allowCapitalDecay.value) return 'Verzehr erlaubt – Puffer bleibt im Normalfall';
+  return t.mode === 'real' ? 'real erhalten' : 'nominal erhalten';
 });
 </script>
 
 <template>
   <div class="stats-grid stats-grid--split">
-    <div class="stat-card capital-card">
-      <label>Kapital nach {{ info.lastYear }} Jahren</label>
-      <h2>{{ formatEUR(info.endBalance) }}</h2>
+    <div class="stat-card capital-card safety-card">
+      <label>Plan-Sicherheit</label>
+      <p class="safety-pct" :class="`success--${successTone}`">{{ info.successRate }} %</p>
+      <p class="safety-caption">
+        aus 1.000 simulierten Marktverläufen · Ziel {{ info.targetSuccess }} %
+      </p>
 
-      <dl class="balance-breakdown balance-breakdown--single">
-        <div class="breakdown-row">
-          <dt>Substanz</dt>
-          <dd>
-            <span class="status-pill" :class="`status-pill--${capitalStatus.tone}`">
-              {{ capitalStatus.text }}
-            </span>
-          </dd>
+      <p v-if="info.infeasible" class="infeasible-note">
+        Ziel mit diesen Parametern nicht erreichbar – selbst ohne Entnahme bleibt das Kapital
+        nicht mit {{ info.targetSuccess }} % Sicherheit erhalten. Senke die Ziel-Sicherheit oder
+        erlaube „Kapital aufzehren".
+      </p>
+
+      <dl class="plan-facts">
+        <div class="plan-fact">
+          <div class="plan-fact-row">
+            <dt>Reichweite</dt>
+            <dd>{{ reach.headline }}</dd>
+          </div>
+          <p v-if="reach.sub" class="fact-sub">{{ reach.sub }}</p>
         </div>
-        <div v-if="info.totalTax > 0" class="breakdown-row">
-          <dt>Steuern <span class="muted">(Lebenszeit)</span></dt>
-          <dd>
-            <span class="amount amount--sm">{{ formatEUR(info.totalTax) }}</span>
-            <span class="delta">∅ {{ info.effectiveRate }}% auf Gewinne</span>
-          </dd>
+
+        <div class="plan-fact">
+          <div class="plan-fact-row">
+            <dt>Median-Restkapital</dt>
+            <dd>{{ formatEUR(info.endBalance) }}</dd>
+          </div>
+          <p class="fact-sub">{{ capitalNote }}</p>
+        </div>
+
+        <div v-if="info.totalTax > 0" class="plan-fact">
+          <div class="plan-fact-row">
+            <dt>Steuern <span class="muted">· Lebenszeit</span></dt>
+            <dd>{{ formatEUR(info.totalTax) }}</dd>
+          </div>
+          <p class="fact-sub">∅ {{ info.effectiveRate }} % auf Gewinne</p>
         </div>
       </dl>
     </div>
@@ -61,12 +99,18 @@ const capitalStatus = computed(() => {
         Jahr 1 → Jahr {{ info.lastYear }} · bei {{ inflationRate.toFixed(1) }}% Inflation<template v-if="info.mode === 'real'"> · Entnahme wächst mit der Inflation</template>
       </span>
 
+      <p v-if="info.hasPension" class="split-line">
+        davon <strong>{{ formatEUR(info.guaranteedMonthlyReal) }}</strong> garantiert (Rente)
+        <span class="split-sep">·</span>
+        <strong>{{ formatEUR(info.atRiskMonthlyReal) }}</strong> aus dem Depot
+      </p>
+
       <dl class="balance-breakdown">
         <div class="breakdown-row">
-          <dt>Nominal <span class="muted">Jahr 1</span></dt>
+          <dt>Sichere Entnahmerate</dt>
           <dd>
-            <span class="amount">{{ formatEUR(info.monthlyTotalIncome) }}</span>
-            <span class="delta">pro Monat</span>
+            <span class="amount">{{ info.withdrawalRatePct }} %</span>
+            <span class="delta">des Startkapitals · p.a.</span>
           </dd>
         </div>
 
@@ -79,7 +123,7 @@ const capitalStatus = computed(() => {
         </div>
 
         <div v-if="info.hasPension" class="breakdown-row">
-          <dt>Gesetzliche Rente</dt>
+          <dt>Gesetzl. Rente <span class="muted">(netto)</span></dt>
           <dd>
             <span class="amount">+{{ formatEUR(info.pensionMonthlyStart) }}</span>
             <span class="delta">/Monat ab Alter {{ info.pensionStartAge }}</span>

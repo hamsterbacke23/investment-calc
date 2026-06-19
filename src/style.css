@@ -31,6 +31,7 @@
   --bar-pension: #e0a44e;
   --bar-return: #d4913a;
   --bar-return-neg: #d64545;
+  --bar-band: hsl(var(--primary));
   --line-real: #1f3038;
   --noise-opacity: 0.02;
 
@@ -82,10 +83,13 @@ a:hover {
   color: hsl(var(--primary) / 0.8);
 }
 
+html { overflow-x: hidden; }
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden; /* contain the off-canvas mobile settings drawer */
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
 }

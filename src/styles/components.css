@@ -97,6 +97,10 @@
   animation: fadeInUp 0.5s ease 0.2s both;
 }
 
+/* --- Mobile settings drawer (hidden on desktop; activated in the media query) --- */
+.settings-fab,
+.settings-backdrop { display: none; }
+
 /* --- Cards --- */
 .card {
   background: hsl(var(--card));
@@ -362,6 +366,67 @@ input[type="range"]::-moz-range-thumb {
   border-top: 3px solid var(--line-real);
 }
 
+.legend-swatch--median { border-top-color: hsl(var(--primary)); }
+.legend-swatch--band { background: hsl(var(--primary) / 0.22); }
+
+/* --- Chart mode toggle (Einkommen ↔ Vermögen) --- */
+.chart-toggle {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+  animation: fadeInUp 0.5s ease 0.25s both;
+}
+
+.segmented--compact {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  width: auto;
+}
+
+.segmented--compact .segmented-btn { padding: 0.4rem 1.1rem; }
+
+/* --- Fan chart (Monte-Carlo depot cone) --- */
+.fan-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fan-band {
+  fill: hsl(var(--primary) / 0.16);
+  stroke: none;
+  animation: fadeIn 0.6s ease both;
+}
+
+.fan-median {
+  fill: none;
+  stroke: hsl(var(--primary));
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 1.5px hsl(var(--background) / 0.8));
+  animation: fadeIn 0.7s ease 0.3s both;
+}
+
+/* Transparent hover columns just host the tooltips over the band. */
+.fan-hover { z-index: 3; }
+
+.fan-col {
+  background: transparent !important;
+  animation: none !important;
+  border-radius: 0 !important;
+}
+
+.fan-col:hover,
+.fan-col.active {
+  filter: none !important;
+  box-shadow: none !important;
+}
+
 /* Plot grid: y-axis | bars, with x-axis labels below the bars */
 .chart-container {
   background: hsl(var(--card));
@@ -437,6 +502,32 @@ input[type="range"]::-moz-range-thumb {
   stroke-linecap: round;
   filter: drop-shadow(0 1px 1.5px hsl(var(--background) / 0.8));
   animation: fadeIn 0.7s ease 0.5s both;
+}
+
+/* Worst→best return envelope, drawn over the bars so they read as the
+   "selected scenario" sliding inside the shaded band. */
+.band-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 3;
+  animation: fadeIn 0.7s ease 0.45s both;
+}
+
+.band-area {
+  fill: hsl(var(--primary) / 0.13);
+}
+
+.band-edge {
+  fill: none;
+  stroke: hsl(var(--primary) / 0.5);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
 .x-axis-spacer { grid-column: 1; grid-row: 2; }
@@ -1209,6 +1300,99 @@ input[type="range"]::-moz-range-thumb {
   outline-offset: 1px;
 }
 
+.segmented--triple {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.segmented--triple .segmented-btn {
+  padding: 0.45rem 0.25rem;
+  font-size: 0.74rem;
+}
+
+/* --- Rendite-Bandbreite (dual-thumb range) --- */
+.scenario-control { margin-bottom: 1rem; }
+
+.band-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.band-readout {
+  font-size: 0.74rem;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.band-slider {
+  position: relative;
+  height: 22px;
+  margin: 0.7rem 0 0.15rem;
+}
+
+.band-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  border-radius: 2px;
+  background: hsl(var(--border));
+  pointer-events: none;
+}
+
+.band-rail-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.45), hsl(var(--primary)));
+}
+
+/* Two overlaid range inputs share one track; only the thumbs stay interactive. */
+.band-slider .band-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: none;
+}
+
+.band-slider .band-input::-webkit-slider-thumb { pointer-events: auto; }
+.band-slider .band-input::-moz-range-thumb { pointer-events: auto; }
+
+/* Max thumb sits above the min thumb so it stays grabbable when they meet. */
+.band-input--min { z-index: 3; }
+.band-input--max { z-index: 4; }
+
+/* --- Endkapital scenario tag + range --- */
+.scenario-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: hsl(var(--primary) / 0.14);
+  color: hsl(var(--primary));
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  vertical-align: middle;
+}
+
+.amount--range {
+  font-size: 1rem !important;
+  white-space: nowrap;
+}
+
 /* --- Pension fields --- */
 .setting-group--pension {
   border-top: 1px dashed hsl(var(--border));
@@ -1243,6 +1427,64 @@ input[type="range"]::-moz-range-thumb {
   color: hsl(var(--muted-foreground));
 }
 
+/* --- Inline checkbox label (e.g. "Ich habe ein Kind") --- */
+.setting-label--inline {
+  font-size: 0.78rem;
+  margin: 0.6rem 0 0.2rem;
+  flex-wrap: wrap;
+}
+
+.setting-hint {
+  font-size: 0.7rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 400;
+}
+
+/* --- Advanced settings (progressive disclosure) --- */
+.advanced {
+  border-top: 1px dashed hsl(var(--border));
+  margin-top: 0.5rem;
+  padding-top: 0.85rem;
+}
+
+.advanced > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.2s ease;
+  user-select: none;
+}
+
+.advanced > summary::-webkit-details-marker { display: none; }
+.advanced > summary:hover { color: hsl(var(--foreground)); }
+
+.advanced-chevron {
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.advanced[open] > summary { color: hsl(var(--foreground)); margin-bottom: 0.85rem; }
+.advanced[open] .advanced-chevron { transform: rotate(90deg); }
+
+.advanced-body { animation: fadeIn 0.25s ease both; }
+
+.advanced-intro {
+  margin: 0 0 1rem;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: hsl(var(--muted-foreground));
+}
+
+.advanced-body .setting-group:last-child { margin-bottom: 0.25rem; }
+
 /* --- Withdrawal hero / capital cards --- */
 .capital-card h2 {
   font-family: 'Cormorant Garamond', Georgia, serif;
@@ -1256,6 +1498,104 @@ input[type="range"]::-moz-range-thumb {
 .balance-breakdown--single { grid-template-columns: 1fr; }
 
 .amount--sm { font-size: 1rem !important; }
+
+/* --- Safety card (left): success % hero + aligned fact list --- */
+.safety-pct {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 2.6rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  margin: 0.1rem 0 0.3rem;
+  transition: color 0.3s ease;
+}
+
+.success--positive { color: hsl(var(--positive)); }
+.success--neutral { color: hsl(var(--primary)); }
+.success--warn { color: hsl(var(--destructive)); }
+
+.safety-caption {
+  font-size: 0.72rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.infeasible-note {
+  margin: 0.85rem 0 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: hsl(var(--destructive));
+  background: hsl(var(--destructive) / 0.08);
+  border: 1px solid hsl(var(--destructive) / 0.25);
+  border-radius: 8px;
+}
+
+.plan-facts {
+  margin: 1.15rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+}
+
+.plan-fact { display: flex; flex-direction: column; gap: 0.12rem; }
+
+.plan-fact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.plan-fact dt {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+
+.plan-fact dt .muted { letter-spacing: 0.04em; }
+
+.plan-fact dd {
+  margin: 0;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--foreground));
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fact-sub {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Guaranteed-vs-at-risk income split (hero card) --- */
+.split-line {
+  margin: 0.1rem 0 0.35rem;
+  font-size: 0.78rem;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.split-line strong {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.split-sep { margin: 0 0.35rem; opacity: 0.5; }
 
 .hero-income { display: flex; flex-direction: column; }
 
@@ -1481,7 +1821,74 @@ input[type="range"]::-moz-range-thumb {
   .stat-card { padding: 1rem 1.15rem; }
   .stat-card h2 { font-size: 1.35rem; }
 
-  .sidebar { width: 100%; min-width: unset; }
+  /* Sidebar becomes an off-canvas drawer; results stay the primary view. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(86vw, 360px);
+    min-width: unset;
+    z-index: 60;
+    margin: 0;
+    padding: 1.25rem 1rem 4rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: hsl(var(--background));
+    border-right: 1px solid hsl(var(--border));
+    box-shadow: 0 0 40px hsl(var(--foreground) / 0.18);
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: none;
+  }
+
+  .settings-open .sidebar { transform: translateX(0); }
+
+  .settings-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: hsl(var(--background) / 0.55);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+  }
+
+  .settings-open .settings-backdrop { opacity: 1; pointer-events: auto; }
+
+  .settings-fab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: fixed;
+    bottom: 1.1rem;
+    right: 1.1rem;
+    z-index: 70;
+    padding: 0.75rem 1.25rem;
+    border: none;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    box-shadow: 0 6px 20px hsl(var(--primary) / 0.4);
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+
+  .settings-fab:active { transform: scale(0.96); }
+  .settings-fab.is-open {
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 6px 20px hsl(var(--foreground) / 0.12);
+  }
+
+  .settings-fab-icon { font-size: 1.05rem; line-height: 1; }
 
   .card { padding: 1rem; margin-bottom: 0.75rem; }
 

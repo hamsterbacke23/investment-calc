@@ -7,6 +7,10 @@ import {
   pensionMonthly,
   pensionStartAge,
   withdrawalStartAge,
+  pensionHasChildren,
+  withdrawalVolatility,
+  targetSuccessRate,
+  etfCostRate,
 } from '../../composables/useInvestmentStore.js';
 </script>
 
@@ -89,7 +93,13 @@ import {
         />
         <span class="setting-value">€/Monat</span>
       </div>
-      <span class="setting-help">In heutiger Kaufkraft – wird inflationsangepasst ausgezahlt</span>
+      <span class="setting-help">In heutiger Kaufkraft (brutto) – netto nach KV/PV &amp; Steuer wird automatisch berechnet</span>
+
+      <label v-if="pensionMonthly > 0" class="setting-label setting-label--inline">
+        <input type="checkbox" v-model="pensionHasChildren" />
+        <span>Ich habe (mind. ein) Kind</span>
+        <span class="setting-hint">– sonst höherer Pflege-Beitrag</span>
+      </label>
 
       <div v-if="pensionMonthly > 0" class="setting-row pension-ages">
         <label class="age-input">
@@ -122,5 +132,53 @@ import {
         Rente läuft ab dem ersten Entnahmejahr
       </span>
     </div>
+
+    <details class="advanced">
+      <summary>
+        <span>Erweiterte Einstellungen</span>
+        <span class="advanced-chevron" aria-hidden="true">›</span>
+      </summary>
+      <div class="advanced-body">
+        <p class="advanced-intro">
+          Sinnvolle Voreinstellungen – nur anfassen, wenn du es genauer willst.
+        </p>
+
+        <div class="setting-group">
+          <label class="setting-label-text">Ziel-Sicherheit</label>
+          <div class="setting-row">
+            <input type="number" v-model.number="targetSuccessRate" min="50" max="99" step="1" />
+            <span class="setting-value">{{ targetSuccessRate }} %</span>
+          </div>
+          <input type="range" v-model.number="targetSuccessRate" min="50" max="99" step="1" />
+          <span class="setting-help">
+            Anteil der simulierten Marktverläufe, in denen der Plan aufgeht. Höher = vorsichtigere Entnahme.
+          </span>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label-text">Schwankung (Volatilität)</label>
+          <div class="setting-row">
+            <input type="number" v-model.number="withdrawalVolatility" min="0" max="40" step="0.5" />
+            <span class="setting-value">{{ withdrawalVolatility.toFixed(1) }} %</span>
+          </div>
+          <input type="range" v-model.number="withdrawalVolatility" min="0" max="40" step="0.5" />
+          <span class="setting-help">
+            Wie stark der Markt pro Jahr schwankt (Standardabweichung). Aktien-ETF ≈ 15 %.
+          </span>
+        </div>
+
+        <div class="setting-group">
+          <label class="setting-label-text">Produktkosten (TER)</label>
+          <div class="setting-row">
+            <input type="number" v-model.number="etfCostRate" min="0" max="3" step="0.05" />
+            <span class="setting-value">{{ etfCostRate.toFixed(2) }} %</span>
+          </div>
+          <input type="range" v-model.number="etfCostRate" min="0" max="3" step="0.05" />
+          <span class="setting-help">
+            Jährliche ETF-Kosten – werden von der Rendite abgezogen. Breiter Welt-ETF ≈ 0,2 %.
+          </span>
+        </div>
+      </div>
+    </details>
   </section>
 </template>

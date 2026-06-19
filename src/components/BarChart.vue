@@ -9,6 +9,8 @@ const props = defineProps({
   maxValue: { type: Number, default: 0 },
   overlayFn: { type: Function, default: null }, // d => line height in % of plot, or null
   overlayLabel: { type: String, default: '' },
+  bandLowerFn: { type: Function, default: null }, // d => lower envelope height in %
+  bandUpperFn: { type: Function, default: null }, // d => upper envelope height in %
   legend: { type: Array, default: () => [] }, // [{ label, color }]
   xLabelFn: { type: Function, default: null },
   caption: { type: String, default: '' },
@@ -62,6 +64,27 @@ const linePoints = computed(() => {
     })
     .join(' ');
 });
+
+// --- Worst/best envelope band (growth only) ---
+const hasBand = computed(() => !!props.bandLowerFn && !!props.bandUpperFn && props.data.length > 0);
+const clampPct = (v) => Math.max(0, Math.min(100, v));
+function bandPoints(fn) {
+  const n = props.data.length;
+  return props.data.map((d, i) => {
+    const x = ((i + 0.5) / n) * 100;
+    const y = 100 - clampPct(fn(d));
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+}
+// Filled area = upper edge left→right, then lower edge right→left.
+const bandArea = computed(() => {
+  if (!hasBand.value) return '';
+  const upper = bandPoints(props.bandUpperFn);
+  const lower = bandPoints(props.bandLowerFn).reverse();
+  return [...upper, ...lower].join(' ');
+});
+const bandUpperLine = computed(() => (hasBand.value ? bandPoints(props.bandUpperFn).join(' ') : ''));
+const bandLowerLine = computed(() => (hasBand.value ? bandPoints(props.bandLowerFn).join(' ') : ''));
 
 // --- Tooltip rows (shared by hover tooltip + mobile tooltip) ---
 function tooltipRows(d) {
@@ -141,6 +164,18 @@ function tooltipRows(d) {
             </span>
           </div>
         </div>
+
+        <svg
+          v-if="hasBand"
+          class="band-overlay"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <polygon class="band-area" :points="bandArea" />
+          <polyline class="band-edge" :points="bandUpperLine" vector-effect="non-scaling-stroke" />
+          <polyline class="band-edge" :points="bandLowerLine" vector-effect="non-scaling-stroke" />
+        </svg>
 
         <svg
           v-if="overlayFn"
