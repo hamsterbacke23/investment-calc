@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import StartingBalanceCard from '../components/withdrawal/StartingBalanceCard.vue';
 import WithdrawalSettingsCard from '../components/withdrawal/WithdrawalSettingsCard.vue';
 import WithdrawalStats from '../components/withdrawal/WithdrawalStats.vue';
+import ModeComparison from '../components/withdrawal/ModeComparison.vue';
 import BarChart from '../components/BarChart.vue';
 import FanChart from '../components/FanChart.vue';
 import {
@@ -90,6 +91,7 @@ const ageLabel = (d) => String(d.age);
       />
 
       <WithdrawalStats />
+      <ModeComparison />
     </div>
   </main>
 </template>

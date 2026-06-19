@@ -97,6 +97,16 @@ const capitalNote = computed(() => {
           <p class="fact-sub">{{ capitalNote }}</p>
         </div>
 
+        <div v-if="info.isDynamic && info.vpwLateAge" class="plan-fact">
+          <div class="plan-fact-row">
+            <dt title="Median über alle Marktverläufe: der stärkste reale Einkommensrückgang über ein 5-Jahres-Fenster. So stark kann das Einkommen in einer Schwächephase fallen.">Einkommens-Risiko</dt>
+            <dd>{{ info.vpwWorst5DropPct }} %</dd>
+          </div>
+          <p class="fact-sub">
+            stärkster realer 5‑Jahres‑Rückgang · im schlechten Markt mit {{ info.vpwLateAge }} ab {{ formatEUR(info.vpwIncomeP10Late) }}/M
+          </p>
+        </div>
+
         <div v-if="info.totalTax > 0" class="plan-fact">
           <div class="plan-fact-row">
             <dt>Steuern <span class="muted">· Lebenszeit</span></dt>

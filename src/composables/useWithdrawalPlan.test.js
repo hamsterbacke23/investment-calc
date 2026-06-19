@@ -130,8 +130,12 @@ describe('Monte-Carlo withdrawal engine', () => {
     // VPW spends the depot down to ~0 by the horizon — far below constant-real.
     expect(dyn.summary.endBalance).toBeLessThan(real.summary.endBalance);
     expect(dyn.summary.endBalance).toBeLessThan(500000 * 0.05);
+    expect(dyn.summary.endBalanceReal).toBeLessThan(real.summary.endBalanceReal);
     // Start rate ≈ the VPW formula for g=4 %, N=30 (~5,7 %).
     expect(parseFloat(dyn.summary.vpwStartRatePct)).toBeCloseTo(vpwRate(0.04, 30) * 100, 1);
+    // Income-volatility figures are populated for VPW.
+    expect(dyn.summary.vpwWorst5DropPct).toBeLessThanOrEqual(0);
+    expect(dyn.summary.vpwIncomeP10Late).toBeGreaterThan(0);
   });
 
   it('the VPW return g sizes the withdrawal independently of the market mean', () => {

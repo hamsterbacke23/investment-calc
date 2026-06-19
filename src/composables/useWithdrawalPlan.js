@@ -153,6 +153,19 @@ function solveMonthlyW1(ctx, shocks) {
   return (lo + hi) / 2;
 }
 
+// Worst forward 5-year real-income change on one path (≤ 0). Captures how hard
+// income can fall in a bad stretch — the core downside of dynamic withdrawal.
+function worst5yrDrop(realInc, n) {
+  let worst = 0;
+  for (let y = 0; y + 5 < n; y++) {
+    if (realInc[y] > 0) {
+      const chg = realInc[y + 5] / realInc[y] - 1;
+      if (chg < worst) worst = chg;
+    }
+  }
+  return worst;
+}
+
 // Linear-interpolated percentile of an ascending-sorted typed array.
 function percentile(sorted, p) {
   const len = sorted.length;
@@ -197,7 +210,7 @@ function pensionNetFactor() {
 // --- The single heavy computation: solve + fan + expected income path ------
 // Exported (in addition to the debounced reactive wrappers below) so tests can
 // run a scenario synchronously without waiting on the debounce.
-export function computeWithdrawalPlan() {
+export function computeWithdrawalPlan(modeOverride) {
   const depot0 = finalBalance.value;
   const empty = {
     rows: [],
@@ -210,12 +223,8 @@ export function computeWithdrawalPlan() {
   const basis0 = Math.min(totalInvested.value, depot0);
   const n = Math.max(1, withdrawalPlanYears.value);
   const i = inflationRate.value / 100;
-  const mode =
-    withdrawalMode.value === 'real'
-      ? 'real'
-      : withdrawalMode.value === 'dynamic'
-        ? 'dynamic'
-        : 'nominal';
+  const rawMode = modeOverride ?? withdrawalMode.value;
+  const mode = rawMode === 'real' ? 'real' : rawMode === 'dynamic' ? 'dynamic' : 'nominal';
   const isDynamic = mode === 'dynamic';
   const decay = !!allowCapitalDecay.value;
 
@@ -264,6 +273,8 @@ export function computeWithdrawalPlan() {
   const incomeByYear = isDynamic
     ? Array.from({ length: n }, () => new Float64Array(PATHS))
     : null;
+  const worstDrops = isDynamic ? new Float64Array(PATHS) : null;
+  const tmpRealInc = isDynamic ? new Float64Array(n) : null;
   const reach = new Int16Array(PATHS); // plan year the depot ran dry, or n+1 if it lasted
   const tmpBal = new Float64Array(n);
   const tmpInc = new Float64Array(n);
@@ -274,9 +285,12 @@ export function computeWithdrawalPlan() {
       balancesByYear[y][p] = tmpBal[y];
       if (incomeByYear) {
         // total net real income = depot net withdrawal + net pension, deflated.
-        incomeByYear[y][p] = (tmpInc[y] + pensionNetNominalOf(y + 1)) / realFactorOf(y + 1);
+        const ri = (tmpInc[y] + pensionNetNominalOf(y + 1)) / realFactorOf(y + 1);
+        incomeByYear[y][p] = ri;
+        tmpRealInc[y] = ri;
       }
     }
+    if (worstDrops) worstDrops[p] = worst5yrDrop(tmpRealInc, n);
     reach[p] = res.depletionYear === 0 ? n + 1 : res.depletionYear;
     if (isSuccess(res, targetEnd)) successCount++;
   }
@@ -317,6 +331,22 @@ export function computeWithdrawalPlan() {
   const p10ReachYear = percentile(reachSorted, 10); // bad-case: the early-depleting tail
   const successRate = (successCount / PATHS) * 100;
   const medianEndBalance = fanBands.length ? fanBands[n - 1].p50 : 0;
+  const medianEndBalanceReal = Math.round(medianEndBalance / realFactorOf(n));
+
+  // VPW income-volatility figures (dynamic only): the typical worst 5-year real
+  // income decline, and the P10 income at ~age 75 (or nearest age in range).
+  let vpwWorst5DropPct = 0;
+  let vpwIncomeP10Late = 0;
+  let vpwLateAge = 0;
+  if (isDynamic && incomeBands.length) {
+    vpwWorst5DropPct = percentile(worstDrops.slice().sort(), 50) * 100;
+    let band = incomeBands.find((b) => b.age === 75);
+    if (!band) {
+      band = incomeBands.reduce((a, b) => (Math.abs(b.age - 75) < Math.abs(a.age - 75) ? b : a));
+    }
+    vpwIncomeP10Late = band.p10;
+    vpwLateAge = band.age;
+  }
 
   // --- Representative (median-path) income breakdown drives the income bars ---
   const { rows: rawRows } = simulate(monthlyW1, ctx, null, { detailed: true });
@@ -366,9 +396,13 @@ export function computeWithdrawalPlan() {
     medianReachYear,
     p10ReachYear,
     medianEndBalance,
+    medianEndBalanceReal,
     fanBands,
     incomeBands,
     vpwStartRate: isDynamic ? vpwRate(g, n) : 0,
+    vpwWorst5DropPct,
+    vpwIncomeP10Late,
+    vpwLateAge,
     pNet,
     pmToday,
     yearsUntilPension,
@@ -401,6 +435,8 @@ function emptySummary() {
     isDynamic: withdrawalMode.value === 'dynamic',
     vpwStartRatePct: '0.0',
     dynIncomeMedianStart: 0, dynIncomeP10Start: 0, dynIncomeP90Start: 0, dynIncomeMedianEnd: 0,
+    vpwWorst5DropPct: 0, vpwIncomeP10Late: 0, vpwLateAge: 0,
+    endBalanceReal: finalBalance.value,
   };
 }
 
@@ -476,7 +512,35 @@ function buildSummary(d) {
     dynIncomeP10Start: ib0.p10,
     dynIncomeP90Start: ib0.p90,
     dynIncomeMedianEnd: ibLast.p50,
+    vpwWorst5DropPct: Math.round(d.vpwWorst5DropPct || 0),
+    vpwIncomeP10Late: d.vpwIncomeP10Late || 0,
+    vpwLateAge: d.vpwLateAge || 0,
+    endBalanceReal: d.medianEndBalanceReal != null ? d.medianEndBalanceReal : d.medianEndBalance,
   };
+}
+
+// Side-by-side comparison of all three strategies (current mode reuses the full
+// plan; the other two run a fresh summary on the same seeded scenario).
+function buildComparison(currentPlan) {
+  const cur = withdrawalMode.value;
+  return ['nominal', 'real', 'dynamic'].map((m) => {
+    const s = m === cur ? currentPlan.summary : computeWithdrawalPlan(m).summary;
+    return {
+      mode: m,
+      startReal: s.monthlyRealStart,
+      endReal: s.monthlyRealEnd,
+      endCapitalReal: s.endBalanceReal,
+      successRate: s.successRate,
+      isDynamic: s.isDynamic,
+      infeasible: s.infeasible,
+    };
+  });
+}
+
+function computePlanWithComparison() {
+  const plan = computeWithdrawalPlan();
+  plan.comparison = buildComparison(plan);
+  return plan;
 }
 
 // The MC solve is the heaviest work in the app; inside a plain computed it would
@@ -484,7 +548,7 @@ function buildSummary(d) {
 // live in the drawer). Instead we hold the result in a ref and recompute on a short
 // debounce — the first change (store hydration from URL/localStorage) runs eagerly
 // to avoid a flash of the default plan, later edits are debounced.
-const planRef = shallowRef(computeWithdrawalPlan());
+const planRef = shallowRef(computePlanWithComparison());
 let recomputeTimer = null;
 let primed = false;
 watch(
@@ -496,12 +560,12 @@ watch(
   () => {
     if (!primed) {
       primed = true;
-      planRef.value = computeWithdrawalPlan();
+      planRef.value = computePlanWithComparison();
       return;
     }
     clearTimeout(recomputeTimer);
     recomputeTimer = setTimeout(() => {
-      planRef.value = computeWithdrawalPlan();
+      planRef.value = computePlanWithComparison();
     }, 160);
   },
 );
@@ -510,6 +574,7 @@ export const calculateWithdrawalData = computed(() => planRef.value.rows);
 export const withdrawalTaxInfo = computed(() => planRef.value.summary);
 export const withdrawalFanBands = computed(() => planRef.value.fanBands);
 export const withdrawalIncomeBands = computed(() => planRef.value.incomeBands || []);
+export const withdrawalModeComparison = computed(() => planRef.value.comparison || []);
 
 // The withdrawal chart visualises INCOME, not the depot balance: each bar is the
 // total net income of that year (net depot withdrawal + net pension).
