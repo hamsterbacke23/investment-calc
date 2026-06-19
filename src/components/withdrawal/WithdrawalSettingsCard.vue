@@ -8,6 +8,7 @@ import {
   pensionStartAge,
   withdrawalStartAge,
   pensionHasChildren,
+  bridgeIncome,
   withdrawalVolatility,
   targetSuccessRate,
   etfCostRate,
@@ -155,6 +156,15 @@ import {
       <span v-else-if="pensionMonthly > 0" class="setting-help">
         Rente läuft ab dem ersten Entnahmejahr
       </span>
+
+      <label
+        v-if="pensionMonthly > 0 && pensionStartAge > withdrawalStartAge"
+        class="setting-label setting-label--inline"
+      >
+        <input type="checkbox" v-model="bridgeIncome" />
+        <span>Einkommen über Rentenbeginn glätten</span>
+        <span class="setting-hint">– Depot zahlt die Rente vor, kein Sprung mit {{ pensionStartAge }}</span>
+      </label>
     </div>
 
     <details class="advanced">

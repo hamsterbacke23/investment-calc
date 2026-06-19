@@ -8,6 +8,7 @@ import {
   pensionStartAge,
   withdrawalStartAge,
   pensionHasChildren,
+  bridgeIncome,
   withdrawalVolatility,
   targetSuccessRate,
   etfCostRate,
@@ -57,7 +58,7 @@ export function vpwRate(g, remaining) {
 // opts.balances füllt die Jahresend-Depotwerte, opts.income die Netto-Entnahme je Jahr,
 // opts.detailed sammelt die volle Aufschlüsselung fürs Einkommens-Chart.
 function simulate(monthlyW1, ctx, shockRow, opts) {
-  const { depot0, basis0, n, i, mode, g, sigmaLog, driftLog } = ctx;
+  const { depot0, basis0, n, i, mode, g, sigmaLog, driftLog, bridgeSupp } = ctx;
   let depot = depot0;
   let basis = basis0;
   let depletionYear = 0;
@@ -72,10 +73,12 @@ function simulate(monthlyW1, ctx, shockRow, opts) {
     const grown = depot * growthFactor;
     const valueGain = grown - depotStart;
 
-    const wPlanned =
+    const baseW =
       mode === 'dynamic'
         ? grown * vpwRate(g, n - Y + 1)
         : baseAnnual * (mode === 'real' ? Math.pow(1 + i, Y - 1) : 1);
+    // Income bridge: pre-pension years also draw the pension pre-payment.
+    const wPlanned = baseW + (bridgeSupp ? bridgeSupp[Y - 1] : 0);
     const wActual = Math.min(wPlanned, Math.max(0, grown));
 
     // Proportionale Durchschnittsmethode: nur der Gewinnanteil der Entnahme ist
@@ -241,7 +244,31 @@ export function computeWithdrawalPlan(modeOverride) {
     decay || isDynamic ? 0 : mode === 'real' ? depot0 * Math.pow(1 + i, n) : depot0;
   const targetSuccess = targetSuccessRate.value / 100;
 
-  const ctx = { depot0, basis0, n, i, mode, g, muNet, sigmaLog, driftLog, targetEnd, targetSuccess };
+  // Net pension per plan year (deterministic, layered on top — never part of the
+  // amortised depot), plus the real deflator for that year.
+  const yearsUntilPension = Math.max(0, pensionStartAge.value - withdrawalStartAge.value);
+  const pmToday = Math.max(0, pensionMonthly.value);
+  const pNet = pensionNetFactor();
+  const realFactorOf = (Y) => Math.pow(1 + i, durationYears.value + (Y - 1));
+  const pensionNetNominalOf = (Y) =>
+    pmToday > 0 && Y > yearsUntilPension ? pmToday * realFactorOf(Y) * 12 * pNet.factor : 0;
+
+  // Income bridge: during the pre-pension years the depot pre-pays ~the later net
+  // pension (nominal), so total income doesn't jump at Rentenbeginn. Only active
+  // when the pension actually starts within the horizon. The supplement is an
+  // extra depot withdrawal (taxed as such), so the depot is drawn down faster.
+  const bridge =
+    !!bridgeIncome.value && pmToday > 0 && yearsUntilPension > 0 && yearsUntilPension < n;
+  const bridgeSupp = new Float64Array(n);
+  if (bridge) {
+    for (let Y = 1; Y <= yearsUntilPension && Y <= n; Y++) {
+      bridgeSupp[Y - 1] = pmToday * realFactorOf(Y) * 12 * pNet.factor;
+    }
+  }
+
+  const ctx = {
+    depot0, basis0, n, i, mode, g, muNet, sigmaLog, driftLog, targetEnd, targetSuccess, bridgeSupp,
+  };
   const shocks = normalShockMatrix(PATHS, n);
 
   // Fixed-withdrawal modes solve for the sustainable amount; VPW derives it yearly.
@@ -258,15 +285,6 @@ export function computeWithdrawalPlan(modeOverride) {
     }
     infeasible = zeroOk / PATHS < targetSuccess - 0.005;
   }
-
-  // Net pension per plan year (deterministic, layered on top — never part of the
-  // amortised depot), plus the real deflator for that year.
-  const yearsUntilPension = Math.max(0, pensionStartAge.value - withdrawalStartAge.value);
-  const pmToday = Math.max(0, pensionMonthly.value);
-  const pNet = pensionNetFactor();
-  const realFactorOf = (Y) => Math.pow(1 + i, durationYears.value + (Y - 1));
-  const pensionNetNominalOf = (Y) =>
-    pmToday > 0 && Y > yearsUntilPension ? pmToday * realFactorOf(Y) * 12 * pNet.factor : 0;
 
   // --- Fan pass: depot balance + (for VPW) net real income across all paths ---
   const balancesByYear = Array.from({ length: n }, () => new Float64Array(PATHS));
@@ -403,6 +421,7 @@ export function computeWithdrawalPlan(modeOverride) {
     vpwWorst5DropPct,
     vpwIncomeP10Late,
     vpwLateAge,
+    bridge,
     pNet,
     pmToday,
     yearsUntilPension,
@@ -437,6 +456,7 @@ function emptySummary() {
     dynIncomeMedianStart: 0, dynIncomeP10Start: 0, dynIncomeP90Start: 0, dynIncomeMedianEnd: 0,
     vpwWorst5DropPct: 0, vpwIncomeP10Late: 0, vpwLateAge: 0,
     endBalanceReal: finalBalance.value,
+    bridgeActive: false,
   };
 }
 
@@ -516,6 +536,7 @@ function buildSummary(d) {
     vpwIncomeP10Late: d.vpwIncomeP10Late || 0,
     vpwLateAge: d.vpwLateAge || 0,
     endBalanceReal: d.medianEndBalanceReal != null ? d.medianEndBalanceReal : d.medianEndBalance,
+    bridgeActive: !!d.bridge,
   };
 }
 
@@ -555,7 +576,8 @@ watch(
   [
     finalBalance, totalInvested, allowCapitalDecay, withdrawalPlanYears, withdrawalReturnRate,
     withdrawalMode, pensionMonthly, pensionStartAge, withdrawalStartAge, pensionHasChildren,
-    withdrawalVolatility, targetSuccessRate, etfCostRate, vpwReturn, durationYears, inflationRate,
+    bridgeIncome, withdrawalVolatility, targetSuccessRate, etfCostRate, vpwReturn,
+    durationYears, inflationRate,
   ],
   () => {
     if (!primed) {

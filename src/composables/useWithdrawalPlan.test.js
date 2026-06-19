@@ -19,6 +19,7 @@ import {
   pensionStartAge,
   withdrawalStartAge,
   pensionHasChildren,
+  bridgeIncome,
 } from './useInvestmentStore.js';
 
 // Pin a known starting depot: no deposits, 0 % growth over 1 year ⇒ depot0 = initialCapital.
@@ -41,6 +42,7 @@ function baseScenario() {
   pensionStartAge.value = 67;
   withdrawalStartAge.value = 60;
   pensionHasChildren.value = true;
+  bridgeIncome.value = false;
 }
 
 beforeEach(baseScenario);
@@ -145,6 +147,27 @@ describe('Monte-Carlo withdrawal engine', () => {
     vpwReturn.value = 6;
     const high = computeWithdrawalPlan().summary.dynIncomeMedianStart;
     expect(high).toBeGreaterThan(low); // higher g → larger initial withdrawal
+  });
+
+  it('the income bridge smooths the pension step (pre-pays the pension)', () => {
+    withdrawalMode.value = 'dynamic';
+    pensionMonthly.value = 1300;
+    withdrawalStartAge.value = 59;
+    pensionStartAge.value = 63;
+    const at = (ib, age) => ib.find((b) => b.age === age).p50;
+
+    bridgeIncome.value = false;
+    const no = computeWithdrawalPlan().incomeBands;
+    bridgeIncome.value = true;
+    const br = computeWithdrawalPlan().incomeBands;
+
+    // Pre-pension income is higher with the bridge (the depot pre-pays the pension).
+    expect(at(br, 61)).toBeGreaterThan(at(no, 61));
+    // The jump at pension start (age 62 → 63) is much smaller — essentially level.
+    const stepNo = Math.abs(at(no, 63) / at(no, 62) - 1);
+    const stepBr = Math.abs(at(br, 63) / at(br, 62) - 1);
+    expect(stepBr).toBeLessThan(stepNo);
+    expect(stepBr).toBeLessThan(0.05);
   });
 
   it('returns an empty plan when there is no capital', () => {

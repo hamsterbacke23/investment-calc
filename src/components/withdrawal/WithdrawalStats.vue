@@ -137,7 +137,12 @@ const capitalNote = computed(() => {
         Der Median sinkt mit der Zeit – das ist normal (Volatility Drag + g über Marktrendite), kein Fehler. Niedrigeres g = gleichmäßiger.
       </p>
 
-      <p v-if="info.hasPension" class="split-line">
+      <p v-if="info.hasPension && info.bridgeActive" class="split-line">
+        Jahr 1: <strong>{{ formatEUR(info.atRiskMonthlyReal) }}</strong> aus dem Depot
+        <span class="split-sep">·</span>
+        Brücke gleicht den Rentenbeginn (Alter {{ info.pensionStartAge }}) aus – kein Sprung
+      </p>
+      <p v-else-if="info.hasPension" class="split-line">
         Jahr 1: <strong>{{ formatEUR(info.atRiskMonthlyReal) }}</strong> aus dem Depot
         <span class="split-sep">·</span>
         + <strong>{{ formatEUR(info.guaranteedMonthlyReal) }}</strong> Rente ab Alter {{ info.pensionStartAge }}

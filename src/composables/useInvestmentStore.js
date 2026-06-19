@@ -56,6 +56,9 @@ export const withdrawalStartAge = ref(60);
 // Pflegeversicherung surcharge for the childless is higher; drives the KV/PV
 // deduction applied to the gross pension.
 export const pensionHasChildren = ref(true);
+// Income bridge: before the pension starts, the depot pre-pays ~the later net
+// pension so total income doesn't jump at Rentenbeginn (early-retirement bridge).
+export const bridgeIncome = ref(false);
 
 // --- Monte-Carlo / advanced (sensible defaults, hidden behind "Erweiterte Einstellungen") ---
 // Annual volatility (stdev) of the depot return — drives the spread of scenarios.
@@ -83,6 +86,7 @@ export function encodeState() {
     psa: pensionStartAge.value,
     wsa: withdrawalStartAge.value,
     phc: pensionHasChildren.value ? 1 : 0,
+    bi: bridgeIncome.value ? 1 : 0,
     vol: withdrawalVolatility.value,
     tsr: targetSuccessRate.value,
     cost: etfCostRate.value,
@@ -107,6 +111,7 @@ function applyState(data) {
   if (data.psa !== undefined) pensionStartAge.value = Math.min(80, Math.max(50, Number(data.psa) || 67));
   if (data.wsa !== undefined) withdrawalStartAge.value = Math.min(90, Math.max(30, Number(data.wsa) || 60));
   if (data.phc !== undefined) pensionHasChildren.value = !!data.phc;
+  if (data.bi !== undefined) bridgeIncome.value = !!data.bi;
   if (data.vol !== undefined) withdrawalVolatility.value = Math.min(40, Math.max(0, Number(data.vol)));
   if (data.tsr !== undefined) targetSuccessRate.value = Math.min(99, Math.max(50, Number(data.tsr)));
   if (data.cost !== undefined) etfCostRate.value = Math.min(3, Math.max(0, Number(data.cost)));
@@ -172,6 +177,7 @@ function saveToLocal() {
     pensionStartAge: pensionStartAge.value,
     withdrawalStartAge: withdrawalStartAge.value,
     pensionHasChildren: pensionHasChildren.value,
+    bridgeIncome: bridgeIncome.value,
     withdrawalVolatility: withdrawalVolatility.value,
     targetSuccessRate: targetSuccessRate.value,
     etfCostRate: etfCostRate.value,
@@ -217,6 +223,7 @@ export function loadFromLocal() {
       withdrawalStartAge.value = Number.isFinite(v) ? Math.min(90, Math.max(30, v)) : 60;
     }
     if (parsed.pensionHasChildren !== undefined) pensionHasChildren.value = !!parsed.pensionHasChildren;
+    if (parsed.bridgeIncome !== undefined) bridgeIncome.value = !!parsed.bridgeIncome;
     if (parsed.withdrawalVolatility !== undefined) {
       const v = Number(parsed.withdrawalVolatility);
       withdrawalVolatility.value = Number.isFinite(v) ? Math.min(40, Math.max(0, v)) : 15;
@@ -304,6 +311,7 @@ export function initInvestmentStore() {
       pensionStartAge,
       withdrawalStartAge,
       pensionHasChildren,
+      bridgeIncome,
       withdrawalVolatility,
       targetSuccessRate,
       etfCostRate,
