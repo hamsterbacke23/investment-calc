@@ -491,7 +491,7 @@ watch(
   [
     finalBalance, totalInvested, allowCapitalDecay, withdrawalPlanYears, withdrawalReturnRate,
     withdrawalMode, pensionMonthly, pensionStartAge, withdrawalStartAge, pensionHasChildren,
-    withdrawalVolatility, targetSuccessRate, etfCostRate, durationYears, inflationRate,
+    withdrawalVolatility, targetSuccessRate, etfCostRate, vpwReturn, durationYears, inflationRate,
   ],
   () => {
     if (!primed) {
