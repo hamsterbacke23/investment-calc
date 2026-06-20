@@ -74,9 +74,13 @@ export const etfCostRate = ref(0.2);
 // deliberately separate from the Monte-Carlo market return above.
 export const vpwReturn = ref(4);
 
-// --- URL state sharing ---
-export function encodeState() {
-  const data = {
+// --- State serialization (shared by the share link AND the saved-scenarios store) ---
+// Compact snapshot of EVERY setting — keys are short because they ride in URLs.
+// Must list the same settings as the watch([...]) in initInvestmentStore so a
+// share link / saved scenario restores the plan exactly. applyState() is its
+// inverse. There is a round-trip test guarding this; keep all three in sync.
+export function serializeState() {
+  return {
     ic: initialCapital.value,
     dy: durationYears.value,
     rg: reinvestGains.value ? 1 : 0,
@@ -98,47 +102,70 @@ export function encodeState() {
     yp: yieldPhases.value.map(p => ({ s: p.startYear, e: p.endYear, lo: p.rateMin, hi: p.rateMax, cd: p.customDuration ? 1 : 0 })),
     tr: transactions.value.map(tx => ({ n: tx.name, a: tx.amount, tp: tx.type === 'monthly' ? 'm' : 'o', s: tx.startYear, e: tx.endYear, cd: tx.customDuration ? 1 : 0 })),
   };
-  return toBase64(JSON.stringify(data));
 }
 
-function applyState(data) {
-  if (data.ic !== undefined) initialCapital.value = data.ic;
-  if (data.dy !== undefined) durationYears.value = data.dy;
+// --- URL state sharing ---
+export function encodeState() {
+  return toBase64(JSON.stringify(serializeState()));
+}
+
+// Coerce a value to a finite number in [lo, hi], else a fallback — so a
+// hand-edited/garbage share link can never push NaN or absurd values into the
+// projection (NaN comparisons silently zero out phases, NaN amounts poison the
+// whole balance). Shared by applyState and the per-array-element fields.
+function clampNum(v, lo, hi, fallback) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+}
+const clampYear = (v, fallback) => Math.round(clampNum(v, 1, 120, fallback));
+
+export function applyState(data) {
+  if (!data || typeof data !== 'object') return;
+  if (data.ic !== undefined) initialCapital.value = clampNum(data.ic, 0, 1e12, 30000);
+  if (data.dy !== undefined) durationYears.value = clampYear(data.dy, 15);
   if (data.rg !== undefined) reinvestGains.value = !!data.rg;
-  if (data.ir !== undefined) inflationRate.value = data.ir;
-  if (data.wpy !== undefined) withdrawalPlanYears.value = Math.min(80, Math.max(1, Number(data.wpy)));
+  if (data.ir !== undefined) inflationRate.value = clampNum(data.ir, 0, 20, 2.5);
+  if (data.wpy !== undefined) withdrawalPlanYears.value = clampNum(data.wpy, 1, 80, 30);
   if (data.acd !== undefined) allowCapitalDecay.value = !!data.acd;
-  if (data.wrr !== undefined) withdrawalReturnRate.value = Math.min(20, Math.max(0, Number(data.wrr)));
+  if (data.wrr !== undefined) withdrawalReturnRate.value = clampNum(data.wrr, 0, 20, 6);
   if (data.wm === 'real' || data.wm === 'nominal' || data.wm === 'dynamic') withdrawalMode.value = data.wm;
-  if (data.pm !== undefined) pensionMonthly.value = Math.max(0, Number(data.pm) || 0);
-  if (data.psa !== undefined) pensionStartAge.value = Math.min(80, Math.max(50, Number(data.psa) || 67));
-  if (data.wsa !== undefined) withdrawalStartAge.value = Math.min(90, Math.max(30, Number(data.wsa) || 60));
+  if (data.pm !== undefined) pensionMonthly.value = clampNum(data.pm, 0, 1e7, 0);
+  if (data.psa !== undefined) pensionStartAge.value = clampNum(data.psa, 50, 80, 67);
+  if (data.wsa !== undefined) withdrawalStartAge.value = clampNum(data.wsa, 30, 90, 60);
   if (data.phc !== undefined) pensionHasChildren.value = !!data.phc;
   if (data.bi !== undefined) bridgeIncome.value = !!data.bi;
-  if (data.vol !== undefined) withdrawalVolatility.value = Math.min(40, Math.max(0, Number(data.vol)));
-  if (data.tsr !== undefined) targetSuccessRate.value = Math.min(99, Math.max(50, Number(data.tsr)));
-  if (data.cost !== undefined) etfCostRate.value = Math.min(3, Math.max(0, Number(data.cost)));
-  if (data.vpw !== undefined) vpwReturn.value = Math.min(15, Math.max(0, Number(data.vpw)));
+  if (data.vol !== undefined) withdrawalVolatility.value = clampNum(data.vol, 0, 40, 15);
+  if (data.tsr !== undefined) targetSuccessRate.value = clampNum(data.tsr, 50, 99, 90);
+  if (data.cost !== undefined) etfCostRate.value = clampNum(data.cost, 0, 3, 0.2);
+  if (data.vpw !== undefined) vpwReturn.value = clampNum(data.vpw, 0, 15, 4);
   if (data.rsc === 'worst' || data.rsc === 'best' || data.rsc === 'avg') returnScenario.value = data.rsc;
-  if (data.yp) {
-    // Coerce + clamp like the scalar fields above, so a hand-edited/garbage
-    // share link can't push NaN/out-of-range rates into the projection.
-    const clampRate = (v, fallback) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? Math.min(20, Math.max(-15, n)) : fallback;
-    };
+  if (Array.isArray(data.yp)) {
+    const clampRate = (v, fallback) => clampNum(v, -15, 20, fallback);
     yieldPhases.value = data.yp.map((p, i) => {
       // Newer links carry a band (lo/hi); older links only a single rate (r).
       const hasBand = p.lo !== undefined || p.hi !== undefined;
       const lo = clampRate(hasBand ? p.lo : p.r, 5);
       const hi = clampRate(hasBand ? p.hi : p.r, lo);
-      return { id: i + 1, startYear: p.s, endYear: p.e, rateMin: lo, rateMax: hi, customDuration: !!p.cd };
+      return {
+        id: i + 1,
+        startYear: clampYear(p.s, 1),
+        endYear: clampYear(p.e, durationYears.value),
+        rateMin: lo, rateMax: hi,
+        customDuration: !!p.cd,
+      };
     });
   }
-  if (data.tr) {
+  if (Array.isArray(data.tr)) {
+    // 'o' must decode to 'once' — the value the projection and DepositsCard use.
+    // ('onetime' would silently drop one-time deposits from a shared plan.)
     transactions.value = data.tr.map((t, i) => ({
-      id: i + 1, name: t.n, amount: t.a, type: t.tp === 'm' ? 'monthly' : 'onetime',
-      startYear: t.s, endYear: t.e, customDuration: !!t.cd,
+      id: i + 1,
+      name: typeof t.n === 'string' ? t.n : 'Einzahlung',
+      amount: clampNum(t.a, 0, 1e9, 0),
+      type: t.tp === 'm' ? 'monthly' : 'once',
+      startYear: clampYear(t.s, 1),
+      endYear: clampYear(t.e, durationYears.value),
+      customDuration: !!t.cd,
     }));
   }
 }
@@ -194,8 +221,16 @@ export function loadFromLocal() {
   if (!saved) return;
   try {
     const parsed = JSON.parse(saved);
-    initialCapital.value = parsed.initialCapital;
-    durationYears.value = parsed.durationYears;
+    // Guard like every other scalar: a partial/foreign blob missing these keys
+    // must not set them to undefined (→ NaN projection).
+    if (parsed.initialCapital !== undefined) {
+      const v = Number(parsed.initialCapital);
+      initialCapital.value = Number.isFinite(v) ? Math.max(0, v) : 30000;
+    }
+    if (parsed.durationYears !== undefined) {
+      const v = Number(parsed.durationYears);
+      durationYears.value = Number.isFinite(v) ? Math.min(120, Math.max(1, Math.round(v))) : 15;
+    }
     if (parsed.reinvestGains !== undefined) reinvestGains.value = parsed.reinvestGains;
     if (parsed.inflationRate !== undefined) {
       const rate = Number(parsed.inflationRate);
@@ -273,6 +308,65 @@ export function loadFromLocal() {
   }
 }
 
+// --- Saved scenarios (lightweight named snapshots in localStorage) ---
+// Each scenario is just { id, name, ts, data: serializeState() } — the same
+// compact blob the share link uses, so it stays tiny. Capped at MAX_SCENARIOS,
+// newest first; saving beyond the cap drops the oldest.
+const SCENARIOS_KEY = 'investment_sim_scenarios_v1';
+export const MAX_SCENARIOS = 10;
+export const savedScenarios = ref([]);
+
+function persistScenarios() {
+  try { localStorage.setItem(SCENARIOS_KEY, JSON.stringify(savedScenarios.value)); } catch { /* quota/private mode */ }
+}
+
+export function loadScenariosFromLocal() {
+  try {
+    const raw = localStorage.getItem(SCENARIOS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    savedScenarios.value = Array.isArray(arr)
+      ? arr.filter((s) => s && typeof s === 'object' && s.data && typeof s.data === 'object').slice(0, MAX_SCENARIOS)
+      : [];
+  } catch {
+    savedScenarios.value = [];
+  }
+}
+
+function newScenarioId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// A readable fallback name from the current plan, e.g. "30k · 15 J · dynamisch".
+export function defaultScenarioName() {
+  const k = Math.round(initialCapital.value / 1000);
+  const mode = { dynamic: 'dynamisch', real: 'real', nominal: 'nominal' }[withdrawalMode.value] || withdrawalMode.value;
+  return `${k}k · ${durationYears.value} J · ${mode}`;
+}
+
+export function saveScenario(name) {
+  const item = {
+    id: newScenarioId(),
+    name: (typeof name === 'string' && name.trim()) || defaultScenarioName(),
+    ts: Date.now(),
+    data: serializeState(),
+  };
+  savedScenarios.value = [item, ...savedScenarios.value].slice(0, MAX_SCENARIOS);
+  persistScenarios();
+  return item;
+}
+
+export function applyScenario(id) {
+  const item = savedScenarios.value.find((s) => s.id === id);
+  if (item) applyState(item.data);
+  return !!item;
+}
+
+export function deleteScenario(id) {
+  savedScenarios.value = savedScenarios.value.filter((s) => s.id !== id);
+  persistScenarios();
+}
+
 // --- Mutators ---
 export const addPhase = () =>
   yieldPhases.value.push({ id: Date.now(), startYear: 1, endYear: durationYears.value, rateMin: 3, rateMax: 7, customDuration: false });
@@ -296,6 +390,7 @@ export function initInvestmentStore() {
   if (initialized) return;
   initialized = true;
   if (!loadFromUrl()) loadFromLocal();
+  loadScenariosFromLocal();
 
   watch(
     [
