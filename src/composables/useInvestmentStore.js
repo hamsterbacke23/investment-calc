@@ -23,8 +23,11 @@ export const inflationRate = ref(2.5);
 //   'avg'   → midpoint of the band (default)
 //   'worst' → lower edge
 //   'best'  → upper edge
+// Default 4–10 % brackets realistic long-horizon (15 yr+) net returns of a broad
+// global equity ETF: ~7 % midpoint (the historical real ~5 % + ~2.5 % inflation),
+// a 4 % floor for a poor stretch and a 10 % ceiling for a strong one.
 export const yieldPhases = ref([
-  { id: 1, startYear: 1, endYear: 15, rateMin: 4, rateMax: 8, customDuration: false },
+  { id: 1, startYear: 1, endYear: 15, rateMin: 4, rateMax: 10, customDuration: false },
 ]);
 export const returnScenario = ref('avg'); // 'avg' | 'worst' | 'best'
 
