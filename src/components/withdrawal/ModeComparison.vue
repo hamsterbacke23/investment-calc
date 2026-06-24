@@ -21,15 +21,15 @@ const select = (m) => { withdrawalMode.value = m; };
 
 <template>
   <section v-if="rows.length" class="card mode-compare">
-    <h3>Strategien im Vergleich <span class="muted">· monatlich netto · heutige Kaufkraft</span></h3>
+    <h3>Strategien im Vergleich <span class="muted">· monatlich netto · nominal, klein: heutige Kaufkraft</span></h3>
     <div class="compare-scroll">
       <table class="compare-table">
         <thead>
           <tr>
             <th>Strategie</th>
-            <th title="Monatliches Nettoeinkommen im 1. Jahr (heutige Kaufkraft)">Start</th>
-            <th title="Median-Nettoeinkommen im letzten Jahr (heutige Kaufkraft)">Ende (Median)</th>
-            <th title="Median-Depotwert am Ende der Laufzeit (heutige Kaufkraft)">Restkapital</th>
+            <th title="Monatliches Nettoeinkommen im 1. Jahr (nominal; klein: heutige Kaufkraft)">Start</th>
+            <th title="Median-Nettoeinkommen im letzten Jahr (nominal; klein: heutige Kaufkraft)">Ende (Median)</th>
+            <th title="Median-Depotwert am Ende der Laufzeit (nominal; klein: heutige Kaufkraft)">Restkapital</th>
           </tr>
         </thead>
         <tbody>
@@ -46,9 +46,24 @@ const select = (m) => { withdrawalMode.value = m; };
               <span class="strat-name">{{ LABELS[r.mode] }}</span>
               <span class="strat-note">{{ NOTE[r.mode] }}</span>
             </td>
-            <td class="num">{{ r.infeasible ? '–' : formatEUR(r.startReal) }}</td>
-            <td class="num">{{ r.infeasible ? '–' : formatEUR(r.endReal) }}</td>
-            <td class="num" :class="{ 'goal-hit': r.isDynamic }">{{ formatEUR(r.endCapitalReal) }}</td>
+            <td class="num">
+              <template v-if="r.infeasible">–</template>
+              <template v-else>
+                <span class="num-nominal">{{ formatEUR(r.startNominal) }}</span>
+                <span class="num-real">~{{ formatEUR(r.startReal) }}</span>
+              </template>
+            </td>
+            <td class="num">
+              <template v-if="r.infeasible">–</template>
+              <template v-else>
+                <span class="num-nominal">{{ formatEUR(r.endNominal) }}</span>
+                <span class="num-real">~{{ formatEUR(r.endReal) }}</span>
+              </template>
+            </td>
+            <td class="num" :class="{ 'goal-hit': r.isDynamic }">
+              <span class="num-nominal">{{ formatEUR(r.endCapitalNominal) }}</span>
+              <span v-if="r.endCapitalNominal > 0" class="num-real">~{{ formatEUR(r.endCapitalReal) }}</span>
+            </td>
           </tr>
         </tbody>
       </table>

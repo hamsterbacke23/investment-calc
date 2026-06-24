@@ -1912,6 +1912,17 @@ input[type="range"]::-moz-range-thumb {
   white-space: nowrap;
 }
 
+/* Nominal primary + heutige Kaufkraft small beneath (the app-wide inflation pattern). */
+.num-nominal { display: block; font-variant-numeric: tabular-nums; }
+.num-real {
+  display: block;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
 .compare-table tbody tr {
   cursor: pointer;
   transition: background 0.15s ease;
@@ -2060,6 +2071,24 @@ input[type="range"]::-moz-range-thumb {
   line-height: 1.25;
   letter-spacing: -0.01em;
   color: hsl(var(--primary));
+  font-variant-numeric: tabular-nums;
+}
+
+/* heutige Kaufkraft, tucked tight under the nominal headline. */
+.phase-real {
+  margin-top: -0.3rem;
+  font-size: 0.8rem;
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+/* heutige Kaufkraft inline after a nominal figure (compact plan-fact rows). */
+.val-real-inline {
+  margin-left: 0.4rem;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
   font-variant-numeric: tabular-nums;
 }
 

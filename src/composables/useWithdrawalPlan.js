@@ -437,6 +437,7 @@ export function computeWithdrawalPlan(modeOverride) {
     pmToday,
     yearsUntilPension,
     infeasible,
+    realFactorOf,
   });
 
   return { rows, fanBands, incomeBands, summary };
@@ -449,6 +450,7 @@ function emptySummary() {
     annualTotalIncome: 0, annualTotalIncomeEnd: 0,
     monthlyTotalIncome: 0, monthlyTotalIncomeEnd: 0,
     monthlyRealStart: 0, monthlyRealEnd: 0,
+    monthlyNominalStart: 0, monthlyNominalEnd: 0,
     monthlyGrossReal: 0, monthlyTaxReal: 0, annualTotalIncomeReal: 0,
     lastYear: 0, totalTax: 0, totalRealizedGain: 0, effectiveRate: '0.0',
     endBalance: finalBalance.value,
@@ -473,7 +475,7 @@ function emptySummary() {
 }
 
 function buildSummary(d) {
-  const { rows, n, mode, isDynamic, depot0, monthlyW1, pNet, pmToday, yearsUntilPension } = d;
+  const { rows, n, mode, isDynamic, depot0, monthlyW1, pNet, pmToday, yearsUntilPension, realFactorOf } = d;
   const first = rows[0];
   const last = rows[rows.length - 1];
   const ib = d.incomeBands || [];
@@ -492,28 +494,42 @@ function buildSummary(d) {
 
   const withdrawalRatePct = depot0 > 0 ? ((monthlyW1 * 12) / depot0 * 100).toFixed(1) : '0.0';
 
-  // --- Life-phase income breakdown (all monthly, net, today's purchasing power) ---
-  // Each phase reports the TOTAL income (depot + pension); split shown beneath.
+  // --- Life-phase income breakdown (monthly, net) ---
+  // total/depot/pension are REAL (today's purchasing power); *Nominal are the
+  // actual €-of-that-year amounts (real × inflation deflator for the phase year).
+  // The card leads with nominal and shows the real value small beneath.
   const totalAtYear = (year) => {
     if (isDynamic && ib.length >= year && ib[year - 1]) return ib[year - 1].p50;
     const r = rows[year - 1];
     return r ? Math.round(r.totalNetReal / 12) : 0;
   };
+  const rf = (year) => (typeof realFactorOf === 'function' ? realFactorOf(year) : 1);
   const pensionRealMonthly = firstPensionRow ? Math.round(firstPensionRow.pensionReal / 12) : 0;
   const startAge = withdrawalStartAge.value;
   const psaV = pensionStartAge.value;
   const endAge = startAge + n - 1;
+  const mkPhase = (label, age, year, pensionReal) => {
+    const total = totalAtYear(year);
+    const depot = Math.max(0, total - pensionReal);
+    const f = rf(year);
+    return {
+      label, age,
+      total, depot, pension: pensionReal,
+      totalNominal: Math.round(total * f),
+      depotNominal: Math.round(depot * f),
+      pensionNominal: Math.round(pensionReal * f),
+    };
+  };
   const phases = [];
   if (pmToday > 0 && yearsUntilPension > 0 && yearsUntilPension < n) {
-    phases.push({ label: 'Vor Rente', age: `${startAge}–${psaV - 1}`, total: totalAtYear(1), pension: 0 });
-    phases.push({ label: 'Ab Rentenbeginn', age: `ab ${psaV}`, total: totalAtYear(yearsUntilPension + 1), pension: pensionRealMonthly });
-    phases.push({ label: 'Ende der Laufzeit', age: `mit ${endAge} · Median`, total: totalAtYear(n), pension: pensionRealMonthly });
+    phases.push(mkPhase('Vor Rente', `${startAge}–${psaV - 1}`, 1, 0));
+    phases.push(mkPhase('Ab Rentenbeginn', `ab ${psaV}`, yearsUntilPension + 1, pensionRealMonthly));
+    phases.push(mkPhase('Ende der Laufzeit', `mit ${endAge} · Median`, n, pensionRealMonthly));
   } else {
     const startPension = pmToday > 0 ? pensionRealMonthly : 0;
-    phases.push({ label: 'Start', age: `mit ${startAge}`, total: totalAtYear(1), pension: startPension });
-    phases.push({ label: 'Ende der Laufzeit', age: `mit ${endAge} · Median`, total: totalAtYear(n), pension: startPension });
+    phases.push(mkPhase('Start', `mit ${startAge}`, 1, startPension));
+    phases.push(mkPhase('Ende der Laufzeit', `mit ${endAge} · Median`, n, startPension));
   }
-  phases.forEach((p) => { p.depot = Math.max(0, p.total - p.pension); });
 
   return {
     monthlyGross: Math.round(first.withdrawal / 12),
@@ -529,6 +545,9 @@ function buildSummary(d) {
     // For VPW the income varies by path → the hero shows the median (p50) income.
     monthlyRealStart: isDynamic ? ib0.p50 : Math.round(first.totalNetReal / 12),
     monthlyRealEnd: isDynamic ? ibLast.p50 : Math.round(last.totalNetReal / 12),
+    // Nominal (actual €-of-that-year, net of tax) counterparts — real × deflator.
+    monthlyNominalStart: Math.round((isDynamic ? ib0.p50 : Math.round(first.totalNetReal / 12)) * (realFactorOf ? realFactorOf(1) : 1)),
+    monthlyNominalEnd: Math.round((isDynamic ? ibLast.p50 : Math.round(last.totalNetReal / 12)) * (realFactorOf ? realFactorOf(n) : 1)),
     // Real (today's purchasing power) versions, so the hero card is consistent.
     monthlyGrossReal: Math.round(first.withdrawalReal / 12),
     monthlyTaxReal: Math.round(first.taxReal / 12),
@@ -587,6 +606,9 @@ function buildComparison(currentPlan) {
       startReal: s.monthlyRealStart,
       endReal: s.monthlyRealEnd,
       endCapitalReal: s.endBalanceReal,
+      startNominal: s.monthlyNominalStart,
+      endNominal: s.monthlyNominalEnd,
+      endCapitalNominal: s.endBalance,
       successRate: s.successRate,
       isDynamic: s.isDynamic,
       infeasible: s.infeasible,

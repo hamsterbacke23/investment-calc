@@ -57,10 +57,12 @@ const lead = computed(() => {
   const t = info.value;
   const ph = t.phases || [];
   if (!ph.length) return null;
-  // Range over the "living" phases (everything but the final year); the end is
-  // stated separately so a decline to the end isn't hidden inside the range.
-  const early = (ph.length > 1 ? ph.slice(0, -1) : ph).map((p) => p.total);
-  const end = ph[ph.length - 1].total;
+  // Lead with the NOMINAL amount (what actually lands in the account, net of tax);
+  // the real value is shown small per phase below. Range over the "living" phases
+  // (everything but the final year); the end is stated separately so a decline to
+  // the end isn't hidden inside the range.
+  const early = (ph.length > 1 ? ph.slice(0, -1) : ph).map((p) => p.totalNominal);
+  const end = ph[ph.length - 1].totalNominal;
   const lo = Math.min(...early);
   const hi = Math.max(...early);
   const range = hi - lo > Math.max(150, hi * 0.04)
@@ -74,10 +76,10 @@ const lead = computed(() => {
     pre: 'Monatlich verfügbar: ~',
     range,
     mid: verb
-      ? ` — netto, heutiges Geld${penText}. ${verb} bis zum Ende auf ~`
-      : ` — netto, heutiges Geld${penText}.`,
+      ? ` — netto, der tatsächliche Auszahlungsbetrag${penText}. ${verb} bis zum Ende auf ~`
+      : ` — netto, der tatsächliche Auszahlungsbetrag${penText}.`,
     endAmount: verb ? `${formatNumber(end)} €` : null,
-    post: verb ? '.' : '',
+    post: verb ? '. Kleine Werte: heutige Kaufkraft.' : ' Kleine Werte: heutige Kaufkraft.',
   };
 });
 
@@ -141,7 +143,9 @@ const shapeNote = computed(() => {
         <div class="plan-fact">
           <div class="plan-fact-row">
             <dt title="Median-Depotwert am Ende der Laufzeit. Bei dynamischer Entnahme ~0 € – genau das Ziel: das Kapital nutzen statt reich zu sterben.">Median-Restkapital</dt>
-            <dd :class="{ 'goal-hit': info.isDynamic }">{{ formatEUR(info.endBalance) }}</dd>
+            <dd :class="{ 'goal-hit': info.isDynamic }">
+              {{ formatEUR(info.endBalance) }}<span v-if="info.endBalance > 0" class="val-real-inline">~{{ formatEUR(info.endBalanceReal) }}</span>
+            </dd>
           </div>
           <p class="fact-sub">{{ capitalNote }}</p>
         </div>
@@ -167,7 +171,7 @@ const shapeNote = computed(() => {
     </div>
 
     <div class="stat-card highlighted hero-income">
-      <label>Monatliches Einkommen · netto · heutige Kaufkraft</label>
+      <label title="Großer Wert: der tatsächliche Auszahlungsbetrag (nominal, netto nach Steuern). Kleiner Wert darunter: dasselbe in heutiger Kaufkraft.">Monatliches Einkommen · netto</label>
 
       <p v-if="lead" class="hero-klartext">{{ lead.pre }}<span class="klartext-amount">{{ lead.range }}</span>{{ lead.mid }}<span v-if="lead.endAmount" class="klartext-amount">{{ lead.endAmount }}</span>{{ lead.post }}</p>
 
@@ -178,10 +182,11 @@ const shapeNote = computed(() => {
             <span class="phase-age">{{ ph.age }}</span>
           </div>
           <dd class="phase-dd">
-            <span class="phase-total">{{ formatEUR(ph.total) }}<span class="per-month"> /Monat</span></span>
+            <span class="phase-total">{{ formatEUR(ph.totalNominal) }}<span class="per-month"> /Monat</span></span>
+            <span class="phase-real">~{{ formatEUR(ph.total) }}</span>
             <span class="phase-split">
               <template v-if="ph.pension > 0">
-                {{ formatEUR(ph.depot) }} Depot + {{ formatEUR(ph.pension) }} Rente
+                {{ formatEUR(ph.depotNominal) }} Depot + {{ formatEUR(ph.pensionNominal) }} Rente
                 <span class="muted">ab {{ info.pensionStartAge }}</span>
               </template>
               <template v-else>nur Depot</template>
